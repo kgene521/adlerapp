@@ -1,4 +1,4 @@
-// AdlerCRM/Models/Models.swift  28/03/2026 18:06:46
+// AdlerCRM/Models/Models.swift  03/04/2026 02:16:32
 import Foundation
 
 // MARK: - Flexible Decoding Helpers
@@ -29,6 +29,11 @@ struct LoginResponse: Codable {
     let token: String?
     let user: UserInfo?
     let error: String?
+    // Lockout fields
+    let locked: Bool?
+    let locked_until: String?
+    let retry_after_minutes: Int?
+    let consecutive_failures: Int?
 }
 
 struct TOTPSetupResponse: Codable {
@@ -72,6 +77,8 @@ struct Business: Identifiable {
     let first_lng: Double?
     let first_pickup_freq: String?
     let first_loc_id: Int?
+    let first_address: String?
+    let first_city: String?
     let is_deleted: Bool?
     let created_at: String?
 }
@@ -84,6 +91,7 @@ extension Business: Codable {
         case location_count, total_est_gallons
         case first_lat, first_lng
         case first_pickup_freq, first_loc_id
+        case first_address, first_city
         case is_deleted, created_at
     }
 
@@ -105,6 +113,8 @@ extension Business: Codable {
         first_lng = try c.flexibleDouble(forKey: .first_lng)
         first_pickup_freq = try? c.decode(String.self, forKey: .first_pickup_freq)
         first_loc_id = try c.flexibleInt(forKey: .first_loc_id)
+        first_address = try? c.decode(String.self, forKey: .first_address)
+        first_city = try? c.decode(String.self, forKey: .first_city)
         is_deleted = try? c.decode(Bool.self, forKey: .is_deleted)
         created_at = try? c.decode(String.self, forKey: .created_at)
     }
@@ -265,6 +275,18 @@ struct ContactEvent: Codable, Identifiable {
     let created_at: String?
 }
 
+// MARK: - Business Note
+
+struct BusinessNote: Codable, Identifiable {
+    let id: Int
+    let business_id: Int
+    let note_text: String
+    let created_by: Int?
+    let created_by_name: String?
+    let is_deleted: Bool?
+    let created_at: String?
+}
+
 // MARK: - Employee
 
 struct Employee: Codable, Identifiable {
@@ -399,5 +421,261 @@ struct SavedRoute: Codable, Identifiable {
         } else {
             stops = nil
         }
+    }
+}
+
+// MARK: - Report Models
+
+struct CollectionSummary: Codable {
+    let total_gallons: Double?
+    let total_pickups: Int?
+    let avg_gallons_per_pickup: Double?
+    let first_pickup: String?
+    let last_pickup: String?
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        total_gallons = try c.flexibleDouble(forKey: .total_gallons)
+        total_pickups = try c.flexibleInt(forKey: .total_pickups)
+        avg_gallons_per_pickup = try c.flexibleDouble(forKey: .avg_gallons_per_pickup)
+        first_pickup = try? c.decode(String.self, forKey: .first_pickup)
+        last_pickup = try? c.decode(String.self, forKey: .last_pickup)
+    }
+}
+
+struct MonthlyBreakdown: Codable, Identifiable {
+    var id: String { month }
+    let month: String
+    let gallons: Double?
+    let pickups: Int?
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        month = try c.decode(String.self, forKey: .month)
+        gallons = try c.flexibleDouble(forKey: .gallons)
+        pickups = try c.flexibleInt(forKey: .pickups)
+    }
+}
+
+struct LocationBreakdown: Codable, Identifiable {
+    let location_id: Int
+    let location_label: String?
+    let gallons: Double?
+    let pickups: Int?
+    var id: Int { location_id }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        location_id = try c.decode(Int.self, forKey: .location_id)
+        location_label = try? c.decode(String.self, forKey: .location_label)
+        gallons = try c.flexibleDouble(forKey: .gallons)
+        pickups = try c.flexibleInt(forKey: .pickups)
+    }
+}
+
+struct CollectionSummaryReport: Codable {
+    let summary: CollectionSummary
+    let monthly: [MonthlyBreakdown]
+    let by_location: [LocationBreakdown]
+}
+
+struct PickupLogEntry: Codable, Identifiable {
+    let id: Int
+    let pickup_date: String?
+    let gallons: Double?
+    let notes: String?
+    let location_address: String?
+    let location_city: String?
+    let employee_name: String?
+    let created_at: String?
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(Int.self, forKey: .id)
+        pickup_date = try? c.decode(String.self, forKey: .pickup_date)
+        gallons = try c.flexibleDouble(forKey: .gallons)
+        notes = try? c.decode(String.self, forKey: .notes)
+        location_address = try? c.decode(String.self, forKey: .location_address)
+        location_city = try? c.decode(String.self, forKey: .location_city)
+        employee_name = try? c.decode(String.self, forKey: .employee_name)
+        created_at = try? c.decode(String.self, forKey: .created_at)
+    }
+}
+
+// MARK: - Report History Models
+
+struct ReportHistoryEntry: Codable, Identifiable {
+    let id: Int
+    let report_name: String?
+    let business_id: Int?
+    let business_name: String?
+    let file_path: String?
+    let period_from: String?
+    let period_to: String?
+    let total_gallons: Double?
+    let generated_by: Int?
+    let generated_by_name: String?
+    let created_at: String?
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(Int.self, forKey: .id)
+        report_name = try? c.decode(String.self, forKey: .report_name)
+        business_id = try c.flexibleInt(forKey: .business_id)
+        business_name = try? c.decode(String.self, forKey: .business_name)
+        file_path = try? c.decode(String.self, forKey: .file_path)
+        period_from = try? c.decode(String.self, forKey: .period_from)
+        period_to = try? c.decode(String.self, forKey: .period_to)
+        total_gallons = try c.flexibleDouble(forKey: .total_gallons)
+        generated_by = try c.flexibleInt(forKey: .generated_by)
+        generated_by_name = try? c.decode(String.self, forKey: .generated_by_name)
+        created_at = try? c.decode(String.self, forKey: .created_at)
+    }
+}
+
+struct GenerateReportResponse: Codable {
+    let ok: Bool?
+    let report: GeneratedReportInfo?
+}
+
+struct GeneratedReportInfo: Codable {
+    let id: Int?
+    let report_name: String?
+    let business_name: String?
+    let total_gallons: Double?
+    let collection_count: Int?
+    let period: String?
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.flexibleInt(forKey: .id)
+        report_name = try? c.decode(String.self, forKey: .report_name)
+        business_name = try? c.decode(String.self, forKey: .business_name)
+        total_gallons = try c.flexibleDouble(forKey: .total_gallons)
+        collection_count = try c.flexibleInt(forKey: .collection_count)
+        period = try? c.decode(String.self, forKey: .period)
+    }
+}
+
+// MARK: - Todo Model
+
+struct TodoItem: Codable, Identifiable {
+    let id: Int
+    let title: String
+    let description: String?
+    let deadline_date: String?
+    let date_entered: String?
+    let date_done: String?
+    let is_done: Bool?
+    let user_id: Int?
+    let user_name: String?
+    let is_deleted: Bool?
+    let created_at: String?
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(Int.self, forKey: .id)
+        title = try c.decode(String.self, forKey: .title)
+        description = try? c.decode(String.self, forKey: .description)
+        deadline_date = try? c.decode(String.self, forKey: .deadline_date)
+        date_entered = try? c.decode(String.self, forKey: .date_entered)
+        date_done = try? c.decode(String.self, forKey: .date_done)
+        is_done = try? c.decode(Bool.self, forKey: .is_done)
+        user_id = try c.flexibleInt(forKey: .user_id)
+        user_name = try? c.decode(String.self, forKey: .user_name)
+        is_deleted = try? c.decode(Bool.self, forKey: .is_deleted)
+        created_at = try? c.decode(String.self, forKey: .created_at)
+    }
+}
+
+struct TodoDateCount: Codable {
+    let id: Int
+    let deadline_date: String?
+    let is_done: Bool?
+}
+
+// MARK: - Notification Models
+
+struct AppNotification: Codable, Identifiable {
+    let id: Int
+    let from_user_id: Int?
+    let to_user_id: Int?
+    let message: String
+    let priority: String?
+    let is_read: Bool?
+    let read_at: String?
+    let from_user_name: String?
+    let is_deleted: Bool?
+    let created_at: String?
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(Int.self, forKey: .id)
+        from_user_id = try c.flexibleInt(forKey: .from_user_id)
+        to_user_id = try c.flexibleInt(forKey: .to_user_id)
+        message = try c.decode(String.self, forKey: .message)
+        priority = try? c.decode(String.self, forKey: .priority)
+        is_read = try? c.decode(Bool.self, forKey: .is_read)
+        read_at = try? c.decode(String.self, forKey: .read_at)
+        from_user_name = try? c.decode(String.self, forKey: .from_user_name)
+        is_deleted = try? c.decode(Bool.self, forKey: .is_deleted)
+        created_at = try? c.decode(String.self, forKey: .created_at)
+    }
+}
+
+struct NotificationUser: Codable, Identifiable {
+    let id: Int
+    let name: String
+    let username: String?
+    let role: String?
+}
+
+// MARK: - Corporate Models
+
+struct CorporateDocument: Codable, Identifiable {
+    let id: Int
+    let file_name: String?
+    let original_name: String?
+    let mime_type: String?
+    let file_size: Int?
+    let doc_type: String?
+    let notes: String?
+    let uploaded_by: Int?
+    let uploaded_by_name: String?
+    let is_deleted: Bool?
+    let created_at: String?
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(Int.self, forKey: .id)
+        file_name = try? c.decode(String.self, forKey: .file_name)
+        original_name = try? c.decode(String.self, forKey: .original_name)
+        mime_type = try? c.decode(String.self, forKey: .mime_type)
+        file_size = try c.flexibleInt(forKey: .file_size)
+        doc_type = try? c.decode(String.self, forKey: .doc_type)
+        notes = try? c.decode(String.self, forKey: .notes)
+        uploaded_by = try c.flexibleInt(forKey: .uploaded_by)
+        uploaded_by_name = try? c.decode(String.self, forKey: .uploaded_by_name)
+        is_deleted = try? c.decode(Bool.self, forKey: .is_deleted)
+        created_at = try? c.decode(String.self, forKey: .created_at)
+    }
+}
+
+struct CorporateNote: Codable, Identifiable {
+    let id: Int
+    let note_text: String
+    let created_by: Int?
+    let created_by_name: String?
+    let is_deleted: Bool?
+    let created_at: String?
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(Int.self, forKey: .id)
+        note_text = try c.decode(String.self, forKey: .note_text)
+        created_by = try c.flexibleInt(forKey: .created_by)
+        created_by_name = try? c.decode(String.self, forKey: .created_by_name)
+        is_deleted = try? c.decode(Bool.self, forKey: .is_deleted)
+        created_at = try? c.decode(String.self, forKey: .created_at)
     }
 }

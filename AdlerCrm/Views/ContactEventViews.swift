@@ -1,4 +1,4 @@
-// AdlerCRM/Views/ContactEventViews.swift  27/03/2026 23:52:35
+// AdlerCRM/Views/ContactEventViews.swift  07/04/2026 20:18:54
 import SwiftUI
 import Combine
 
@@ -132,7 +132,7 @@ struct ContactRow: View {
 
             VStack(alignment: .trailing, spacing: 2) {
                 if let phone = contact.phone, !phone.isEmpty {
-                    Label(phone, systemImage: "phone")
+                    Label(PhoneFormatter.format(phone), systemImage: "phone")
                         .font(.custom("DMSans-Regular", size: 11))
                         .foregroundColor(Color(hex: "7a7f94"))
                         .lineLimit(1)
@@ -187,7 +187,11 @@ struct ContactFormSheet: View {
 
                     formField(label: "Name *", text: $name, placeholder: "Full name")
                     formField(label: "Title", text: $title, placeholder: "e.g. Manager, Owner")
-                    formField(label: "Phone", text: $phone, placeholder: "540-555-1234", keyboard: .phonePad)
+                    formField(label: "Phone", text: $phone, placeholder: "(540) 555-1234", keyboard: .phonePad)
+                        .onChange(of: phone) { _, new in
+                            let formatted = PhoneFormatter.autoFormat(new)
+                            if formatted != new { phone = formatted }
+                        }
                     formField(label: "Email", text: $email, placeholder: "name@example.com", keyboard: .emailAddress)
 
                     Toggle(isOn: $isPrimary) {
@@ -234,7 +238,7 @@ struct ContactFormSheet: View {
                 if let c = contact {
                     name = c.name
                     title = c.title ?? ""
-                    phone = c.phone ?? ""
+                    phone = PhoneFormatter.format(c.phone)
                     email = c.email ?? ""
                     isPrimary = c.is_primary ?? false
                 }
@@ -812,6 +816,444 @@ struct LogEventSheet: View {
             } catch {
                 errorMsg = error.localizedDescription
             }
+            saving = false
+        }
+    }
+}
+
+// MARK: - Notes Section (used in BusinessDetailView)
+
+struct NotesSection: View {
+    let notes: [BusinessNote]
+    let loading: Bool
+    let businessId: Int
+    let onReload: () -> Void
+
+    @State private var showAddSheet = false
+    @State private var selectedNote: BusinessNote?
+
+    private var recentNotes: [BusinessNote] {
+        Array(notes.prefix(3))
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // Header
+            HStack {
+                Label("Notes", systemImage: "note.text")
+                    .font(.custom("Syne-Bold", size: 15))
+                    .foregroundColor(Color(hex: "0f1117"))
+                if !notes.isEmpty {
+                    Text("\(notes.count)")
+                        .font(.custom("DMSans-SemiBold", size: 10))
+                        .foregroundColor(Color(hex: "7a7f94"))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 1)
+                        .background(Color(hex: "e2dfd6"))
+                        .cornerRadius(50)
+                }
+                Spacer()
+                Button(action: { showAddSheet = true }) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 18))
+                        .foregroundColor(Color(hex: "c8893a"))
+                }
+            }
+
+            if loading {
+                ProgressView().frame(maxWidth: .infinity, alignment: .center).padding(.vertical, 6)
+            } else if notes.isEmpty {
+                Text("No notes yet")
+                    .font(.custom("DMSans-Regular", size: 12))
+                    .foregroundColor(Color(hex: "7a7f94"))
+                    .padding(.vertical, 2)
+            } else {
+                ForEach(recentNotes) { note in
+                    Button(action: { selectedNote = note }) {
+                        NoteRowCompact(note: note)
+                    }
+                    .buttonStyle(.plain)
+                    if note.id != recentNotes.last?.id {
+                        Divider()
+                    }
+                }
+
+                // See all link
+                if notes.count > 3 {
+                    Divider()
+                    NavigationLink(destination: NotesListView(businessId: businessId, initialNotes: notes, onReload: onReload)) {
+                        HStack {
+                            Text("See all \(notes.count) notes")
+                                .font(.custom("DMSans-Medium", size: 13))
+                                .foregroundColor(Color(hex: "c8893a"))
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundColor(Color(hex: "c8893a"))
+                        }
+                        .padding(.top, 2)
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .background(Color.white)
+        .cornerRadius(14)
+        .shadow(color: Color.black.opacity(0.04), radius: 6, y: 2)
+        .sheet(isPresented: $showAddSheet) {
+            AddNoteSheet(businessId: businessId, onSave: onReload)
+        }
+        .sheet(item: $selectedNote) { note in
+            NoteDetailSheet(note: note, onUpdate: onReload)
+        }
+    }
+}
+
+// MARK: - Compact Note Row (used in both card and list)
+
+struct NoteRowCompact: View {
+    let note: BusinessNote
+
+    var body: some View {
+        HStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(note.note_text)
+                    .font(.custom("DMSans-Regular", size: 13))
+                    .foregroundColor(Color(hex: "0f1117"))
+                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(formatDate(note.created_at))
+                        .font(.custom("DMSans-Regular", size: 10))
+                        .foregroundColor(Color(hex: "7a7f94"))
+                    if let author = note.created_by_name {
+                        Text("·").font(.system(size: 8)).foregroundColor(Color(hex: "e2dfd6"))
+                        Text(author)
+                            .font(.custom("DMSans-Medium", size: 10))
+                            .foregroundColor(Color(hex: "c8893a"))
+                    }
+                }
+            }
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundColor(Color(hex: "e2dfd6"))
+        }
+        .padding(.vertical, 2)
+    }
+
+    private func formatDate(_ dateStr: String?) -> String {
+        guard let str = dateStr else { return "—" }
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        guard let date = iso.date(from: str) ?? ISO8601DateFormatter().date(from: str) else {
+            return String(str.prefix(10))
+        }
+        let fmt = DateFormatter()
+        fmt.dateFormat = "MMM d, yyyy h:mm a"
+        return fmt.string(from: date)
+    }
+}
+
+// MARK: - Notes List View (full list)
+
+struct NotesListView: View {
+    let businessId: Int
+    let initialNotes: [BusinessNote]
+    let onReload: () -> Void
+
+    @State private var notes: [BusinessNote] = []
+    @State private var loading = false
+    @State private var showAddSheet = false
+    @State private var selectedNote: BusinessNote?
+
+    var body: some View {
+        List {
+            ForEach(notes) { note in
+                Button(action: { selectedNote = note }) {
+                    NoteRowCompact(note: note)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .listStyle(.plain)
+        .navigationTitle("Notes")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                HStack(spacing: 14) {
+                    Button(action: { showAddSheet = true }) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 18))
+                            .foregroundColor(Color(hex: "c8893a"))
+                    }
+                    Button(action: refresh) {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 14))
+                            .foregroundColor(Color(hex: "7a7f94"))
+                    }
+                }
+            }
+        }
+        .overlay {
+            if !loading && notes.isEmpty {
+                VStack(spacing: 10) {
+                    Image(systemName: "note.text")
+                        .font(.system(size: 32))
+                        .foregroundColor(Color(hex: "e2dfd6"))
+                    Text("No notes yet")
+                        .font(.custom("DMSans-Regular", size: 14))
+                        .foregroundColor(Color(hex: "7a7f94"))
+                }
+            }
+        }
+        .onAppear { notes = initialNotes }
+        .sheet(isPresented: $showAddSheet) {
+            AddNoteSheet(businessId: businessId, onSave: {
+                onReload()
+                refresh()
+            })
+        }
+        .sheet(item: $selectedNote) { note in
+            NoteDetailSheet(note: note, onUpdate: {
+                onReload()
+                refresh()
+            })
+        }
+    }
+
+    private func refresh() {
+        Task {
+            loading = true
+            do { notes = try await APIClient.shared.getBusinessNotes(bizId: businessId) } catch { }
+            loading = false
+        }
+    }
+}
+
+// MARK: - Note Row (legacy, kept for compatibility)
+
+struct NoteRow: View {
+    let note: BusinessNote
+
+    var body: some View {
+        NoteRowCompact(note: note)
+    }
+}
+
+// MARK: - Note Detail Sheet
+
+struct NoteDetailSheet: View {
+    let note: BusinessNote
+    let onUpdate: () -> Void
+
+    @Environment(\.dismiss) var dismiss
+    @State private var isEditing = false
+    @State private var editText = ""
+    @State private var saving = false
+    @State private var errorMsg = ""
+    @State private var showDeleteConfirm = false
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    if !errorMsg.isEmpty {
+                        Text(errorMsg)
+                            .font(.custom("DMSans-Regular", size: 13))
+                            .foregroundColor(Color(hex: "c1121f"))
+                            .padding(12)
+                            .frame(maxWidth: .infinity)
+                            .background(Color(hex: "ffe5e7"))
+                            .cornerRadius(8)
+                    }
+
+                    // Timestamp + author
+                    HStack(spacing: 8) {
+                        Image(systemName: "clock")
+                            .font(.system(size: 12))
+                            .foregroundColor(Color(hex: "7a7f94"))
+                        Text(formatDate(note.created_at))
+                            .font(.custom("DMSans-Regular", size: 13))
+                            .foregroundColor(Color(hex: "7a7f94"))
+                        if let author = note.created_by_name {
+                            Text("·").foregroundColor(Color(hex: "e2dfd6"))
+                            Text(author)
+                                .font(.custom("DMSans-Medium", size: 13))
+                                .foregroundColor(Color(hex: "c8893a"))
+                        }
+                    }
+
+                    Divider()
+
+                    // Note text or edit field
+                    if isEditing {
+                        TextEditor(text: $editText)
+                            .font(.custom("DMSans-Regular", size: 15))
+                            .foregroundColor(Color(hex: "0f1117"))
+                            .frame(minHeight: 200)
+                            .padding(8)
+                            .background(Color.white)
+                            .cornerRadius(8)
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: "e2dfd6"), lineWidth: 1))
+                    } else {
+                        Text(note.note_text)
+                            .font(.custom("DMSans-Regular", size: 15))
+                            .foregroundColor(Color(hex: "0f1117"))
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+                .padding(20)
+            }
+            .background(Color(hex: "f5f4f0"))
+            .navigationTitle("Note")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    if isEditing {
+                        Button("Cancel") { isEditing = false; editText = note.note_text }
+                            .font(.custom("DMSans-Regular", size: 14))
+                            .foregroundColor(Color(hex: "7a7f94"))
+                    } else {
+                        Button(action: { showDeleteConfirm = true }) {
+                            Image(systemName: "trash")
+                                .font(.system(size: 14))
+                                .foregroundColor(Color(hex: "c1121f"))
+                        }
+                    }
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    if isEditing {
+                        Button(action: saveEdit) {
+                            if saving { ProgressView().scaleEffect(0.8) }
+                            else { Text("Save").font(.custom("DMSans-SemiBold", size: 14)) }
+                        }
+                        .foregroundColor(Color(hex: "2d6a4f"))
+                        .disabled(saving || editText.trimmingCharacters(in: .whitespaces).isEmpty)
+                    } else {
+                        HStack(spacing: 14) {
+                            Button(action: { editText = note.note_text; isEditing = true }) {
+                                Image(systemName: "pencil")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(Color(hex: "c8893a"))
+                            }
+                            Button("Done") { dismiss() }
+                                .font(.custom("DMSans-Medium", size: 14))
+                                .foregroundColor(Color(hex: "c8893a"))
+                        }
+                    }
+                }
+            }
+            .confirmationDialog("Delete this note?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
+                Button("Delete", role: .destructive) { deleteNote() }
+                Button("Cancel", role: .cancel) { }
+            } message: {
+                Text("This note will be permanently removed.")
+            }
+            .onAppear { editText = note.note_text }
+        }
+    }
+
+    private func saveEdit() {
+        saving = true; errorMsg = ""
+        Task {
+            do {
+                _ = try await APIClient.shared.updateBusinessNote(id: note.id, text: editText.trimmingCharacters(in: .whitespaces))
+                onUpdate()
+                dismiss()
+            } catch { errorMsg = error.localizedDescription }
+            saving = false
+        }
+    }
+
+    private func deleteNote() {
+        Task {
+            do {
+                _ = try await APIClient.shared.deleteBusinessNote(id: note.id)
+                onUpdate()
+                dismiss()
+            } catch { errorMsg = error.localizedDescription }
+        }
+    }
+
+    private func formatDate(_ dateStr: String?) -> String {
+        guard let str = dateStr else { return "—" }
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        guard let date = iso.date(from: str) ?? ISO8601DateFormatter().date(from: str) else {
+            return String(str.prefix(10))
+        }
+        let fmt = DateFormatter()
+        fmt.dateFormat = "EEEE, MMM d, yyyy 'at' h:mm a"
+        return fmt.string(from: date)
+    }
+}
+
+// MARK: - Add Note Sheet
+
+struct AddNoteSheet: View {
+    let businessId: Int
+    let onSave: () -> Void
+
+    @Environment(\.dismiss) var dismiss
+    @State private var noteText = ""
+    @State private var saving = false
+    @State private var errorMsg = ""
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 16) {
+                if !errorMsg.isEmpty {
+                    Text(errorMsg)
+                        .font(.custom("DMSans-Regular", size: 13))
+                        .foregroundColor(Color(hex: "c1121f"))
+                        .padding(12)
+                        .frame(maxWidth: .infinity)
+                        .background(Color(hex: "ffe5e7"))
+                        .cornerRadius(8)
+                }
+
+                TextEditor(text: $noteText)
+                    .font(.custom("DMSans-Regular", size: 15))
+                    .foregroundColor(Color(hex: "0f1117"))
+                    .frame(minHeight: 200)
+                    .padding(8)
+                    .background(Color.white)
+                    .cornerRadius(8)
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: "e2dfd6"), lineWidth: 1))
+
+                Spacer()
+            }
+            .padding(20)
+            .background(Color(hex: "f5f4f0"))
+            .navigationTitle("New Note")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") { dismiss() }
+                        .font(.custom("DMSans-Regular", size: 14))
+                        .foregroundColor(Color(hex: "7a7f94"))
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: save) {
+                        if saving { ProgressView().scaleEffect(0.8) }
+                        else { Text("Save").font(.custom("DMSans-SemiBold", size: 14)) }
+                    }
+                    .foregroundColor(Color(hex: "2d6a4f"))
+                    .disabled(saving || noteText.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+        }
+    }
+
+    private func save() {
+        saving = true; errorMsg = ""
+        Task {
+            do {
+                _ = try await APIClient.shared.createBusinessNote(bizId: businessId, text: noteText.trimmingCharacters(in: .whitespaces))
+                onSave()
+                dismiss()
+            } catch { errorMsg = error.localizedDescription }
             saving = false
         }
     }

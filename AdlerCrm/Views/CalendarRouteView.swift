@@ -1,4 +1,4 @@
-// AdlerCRM/Views/CalendarRouteView.swift  28/03/2026 22:47:39
+// AdlerCRM/Views/CalendarRouteView.swift  02/04/2026 23:44:23
 import SwiftUI
 import MapKit
 import CoreLocation
@@ -33,7 +33,6 @@ struct CalendarRouteView: View {
 
     // Collapse
     @State private var showControls = false
-    @State private var showMap = true
     @State private var showSaveSheet = false
 
     private var isToday: Bool {
@@ -84,7 +83,6 @@ struct CalendarRouteView: View {
                     startName: currentStartName,
                     cameraPosition: $cameraPosition,
                     isDirty: $isDirty,
-                    showMap: $showMap,
                     onReset: {
                         route = originalRoute
                         isDirty = false

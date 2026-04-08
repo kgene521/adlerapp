@@ -1,4 +1,4 @@
-// AdlerCRM/Services/RouteEngine.swift  28/03/2026 20:51:25
+// /AdlerCRM/Services/RouteEngine.swift  08/04/2026 00:51:00 EDT
 import Foundation
 import CoreLocation
 
@@ -35,7 +35,7 @@ struct RouteResult {
 // MARK: - Region Info (for picker)
 
 struct RegionInfo: Identifiable, Hashable {
-    let id: Int        // -1 = all, -2 = unassigned
+    let id: Int        // -1 = all
     let name: String
     let centerLat: Double?
     let centerLng: Double?
@@ -64,15 +64,6 @@ enum RouteEngine {
             }
         }
 
-        if candidates.contains(where: { $0.region_id == nil }) {
-            let unassigned = candidates.filter { $0.region_id == nil }
-            let lats = unassigned.compactMap { $0.latitude }
-            let lngs = unassigned.compactMap { $0.longitude }
-            let avgLat = lats.isEmpty ? nil : lats.reduce(0, +) / Double(lats.count)
-            let avgLng = lngs.isEmpty ? nil : lngs.reduce(0, +) / Double(lngs.count)
-            options.append(RegionInfo(id: -2, name: "Unassigned", centerLat: avgLat, centerLng: avgLng))
-        }
-
         options.sort { $0.name < $1.name }
         if options.count > 1 {
             options.insert(allRegionsInfo, at: 0)
@@ -82,7 +73,7 @@ enum RouteEngine {
 
     /// Find the region closest to a given coordinate
     static func closestRegionId(to coord: CLLocationCoordinate2D, from regions: [RegionInfo]) -> Int {
-        let regionsOnly = regions.filter { $0.id >= 0 || $0.id == -2 }
+        let regionsOnly = regions.filter { $0.id >= 0 }
         guard !regionsOnly.isEmpty else { return -1 }
 
         var closestId = regionsOnly.first!.id
@@ -115,8 +106,6 @@ enum RouteEngine {
         let filtered: [RouteCandidate]
         if regionId == -1 {
             filtered = candidates
-        } else if regionId == -2 {
-            filtered = candidates.filter { $0.region_id == nil }
         } else {
             filtered = candidates.filter { $0.region_id == regionId }
         }

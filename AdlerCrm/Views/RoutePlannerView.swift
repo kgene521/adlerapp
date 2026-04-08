@@ -1,4 +1,4 @@
-// AdlerCRM/Views/RoutePlannerView.swift  28/03/2026 22:28:54
+// AdlerCRM/Views/RoutePlannerView.swift  03/04/2026 00:38:30
 import SwiftUI
 import MapKit
 import CoreLocation
@@ -30,6 +30,7 @@ private let defaultStartCoord = CLLocationCoordinate2D(latitude: 37.2710, longit
 // MARK: - Route Planner View
 
 struct RoutePlannerView: View {
+    @EnvironmentObject var auth: AuthManager
     @StateObject private var locationManager = LocationHelper()
     @State private var candidates: [RouteCandidate] = []
     @State private var route: [RouteStop] = []
@@ -40,6 +41,9 @@ struct RoutePlannerView: View {
     @State private var nextReadyDate: Date?
     @State private var nextReadyCount = 0
     @State private var isDirty = false
+
+    // Route mode: 0 = Calculate, 1 = Manual, 2 = Saved
+    @State private var routeMode = 0
 
     // Starting location
     @State private var selectedStartId: String = "current"
@@ -53,49 +57,49 @@ struct RoutePlannerView: View {
 
     // Collapse
     @State private var showControls = false
-    @State private var showMap = true
     @State private var showSaveSheet = false
+    @State private var showTodayTasks = false
+
+    // Manual mode
+    @State private var manualBusinesses: [Business] = []
+    @State private var manualLocations: [Location] = []
+    @State private var manualStops: [CustomStop] = []
+    @State private var showAddStop = false
+    @State private var manualLoading = false
+
+    // Saved mode
+    @State private var showLoadRoutes = false
+    @State private var loadedRouteName: String = ""
+
+    private var isAdmin: Bool { auth.currentUser?.role == "Administrator" }
+
+    private var manualExistingIds: Set<Int> {
+        Set(manualStops.compactMap { stop in
+            if case .business(_, let locId) = stop.source { return locId }
+            return nil
+        })
+    }
 
     var body: some View {
         VStack(spacing: 0) {
-            if loading {
-                Spacer()
-                ProgressView("Calculating routes…")
-                    .font(.custom("DMSans-Regular", size: 14))
-                Spacer()
-            } else if !errorMsg.isEmpty {
-                errorView
-            } else if route.isEmpty {
-                controlBar
-                RouteEmptyView(
-                    regionName: selectedRegionId >= 0 ? currentRegionName : nil,
-                    nextReadyDate: nextReadyDate,
-                    nextReadyCount: nextReadyCount
-                )
-            } else {
-                // Compact summary bar (always visible)
-                compactBar
+            // Mode picker
+            Picker("Route Mode", selection: $routeMode) {
+                Text("Calculate").tag(0)
+                Text("Manual").tag(1)
+                Text("Saved").tag(2)
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(Color(hex: "f5f4f0"))
+            .overlay(Rectangle().fill(Color(hex: "e2dfd6")).frame(height: 1), alignment: .bottom)
 
-                // Expanded controls (collapsible)
-                if showControls {
-                    controlBar
-                }
-
-                // Route map + list
-                RouteMapListView(
-                    route: $route,
-                    startCoord: startCoord,
-                    regionName: currentRegionName,
-                    startName: currentStartName,
-                    cameraPosition: $cameraPosition,
-                    isDirty: $isDirty,
-                    showMap: $showMap,
-                    onReset: {
-                        route = originalRoute
-                        isDirty = false
-                        cameraPosition = .automatic
-                    }
-                )
+            // Mode content
+            switch routeMode {
+            case 0: calculateModeContent
+            case 1: manualModeContent
+            case 2: savedModeContent
+            default: EmptyView()
             }
         }
         .navigationTitle("Today's Route")
@@ -118,17 +122,34 @@ struct RoutePlannerView: View {
                             }
                         }
                     }
-                    Button(action: reload) {
-                        Image(systemName: "arrow.clockwise")
-                            .foregroundColor(Color(hex: "7a7f94"))
+                    Button(action: { showTodayTasks = true }) {
+                        Image(systemName: "checklist")
+                            .font(.system(size: 14))
+                            .foregroundColor(Color(hex: "c8893a"))
+                    }
+                    if routeMode == 0 {
+                        Button(action: reload) {
+                            Image(systemName: "arrow.clockwise")
+                                .foregroundColor(Color(hex: "7a7f94"))
+                        }
                     }
                 }
             }
         }
         .task { await loadAndCompute() }
         .onChange(of: selectedRegionId) { _, _ in
+            if routeMode != 0 { return }
             if regionAutoSelected { regionAutoSelected = false; return }
             recompute()
+        }
+        .onChange(of: routeMode) { _, newMode in
+            route = []; originalRoute = []; isDirty = false; cameraPosition = .automatic
+            switch newMode {
+            case 0: reload()
+            case 1: Task { await loadManualData() }
+            case 2: showLoadRoutes = true
+            default: break
+            }
         }
         .sheet(isPresented: $showStartPicker) {
             StartLocationPickerSheet(
@@ -151,6 +172,229 @@ struct RoutePlannerView: View {
                 }
             )
         }
+        .sheet(isPresented: $showTodayTasks) {
+            TodayTasksSheet()
+        }
+        .sheet(isPresented: $showAddStop) {
+            AddStopSheet(
+                businesses: manualBusinesses,
+                locations: manualLocations,
+                existingStopIds: manualExistingIds,
+                onAdd: { stop in
+                    manualStops.append(stop)
+                    route = manualStopsToRoute()
+                    originalRoute = route
+                    cameraPosition = .automatic
+                }
+            )
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showLoadRoutes) {
+            LoadRoutesSheet(
+                isAdmin: isAdmin,
+                onLoad: { savedRoute in
+                    loadSavedRoute(savedRoute)
+                }
+            )
+        }
+    }
+
+    // MARK: - Calculate Mode
+
+    private var calculateModeContent: some View {
+        Group {
+            if loading {
+                Spacer()
+                ProgressView("Calculating routes…")
+                    .font(.custom("DMSans-Regular", size: 14))
+                Spacer()
+            } else if !errorMsg.isEmpty {
+                errorView
+            } else if route.isEmpty {
+                controlBar
+                RouteEmptyView(
+                    regionName: selectedRegionId >= 0 ? currentRegionName : nil,
+                    nextReadyDate: nextReadyDate,
+                    nextReadyCount: nextReadyCount
+                )
+            } else {
+                compactBar
+                if showControls { controlBar }
+                RouteMapListView(
+                    route: $route,
+                    startCoord: startCoord,
+                    regionName: currentRegionName,
+                    startName: currentStartName,
+                    cameraPosition: $cameraPosition,
+                    isDirty: $isDirty,
+                    onReset: {
+                        route = originalRoute
+                        isDirty = false
+                        cameraPosition = .automatic
+                    }
+                )
+            }
+        }
+    }
+
+    // MARK: - Manual Mode
+
+    private var manualModeContent: some View {
+        Group {
+            if manualLoading {
+                Spacer()
+                ProgressView("Loading businesses…")
+                    .font(.custom("DMSans-Regular", size: 14))
+                Spacer()
+            } else if route.isEmpty {
+                controlBar
+                manualAddBar
+                VStack(spacing: 12) {
+                    Spacer()
+                    Image(systemName: "hand.point.up.left.fill")
+                        .font(.system(size: 36))
+                        .foregroundColor(Color(hex: "e2dfd6"))
+                    Text("Add stops to build your route")
+                        .font(.custom("DMSans-Regular", size: 14))
+                        .foregroundColor(Color(hex: "7a7f94"))
+                    Spacer()
+                }
+            } else {
+                compactBar
+                if showControls { controlBar }
+                manualAddBar
+                RouteMapListView(
+                    route: $route,
+                    startCoord: startCoord,
+                    regionName: nil,
+                    startName: currentStartName,
+                    cameraPosition: $cameraPosition,
+                    isDirty: $isDirty,
+                    showFillData: false,
+                    onReset: {
+                        route = originalRoute
+                        isDirty = false
+                        cameraPosition = .automatic
+                    }
+                )
+            }
+        }
+    }
+
+    // MARK: - Saved Mode
+
+    private var savedModeContent: some View {
+        Group {
+            if route.isEmpty {
+                controlBar
+                VStack(spacing: 12) {
+                    Spacer()
+                    Image(systemName: "folder")
+                        .font(.system(size: 36))
+                        .foregroundColor(Color(hex: "e2dfd6"))
+                    if loadedRouteName.isEmpty {
+                        Text("Select a saved route")
+                            .font(.custom("DMSans-Regular", size: 14))
+                            .foregroundColor(Color(hex: "7a7f94"))
+                    } else {
+                        Text("Route has no stops")
+                            .font(.custom("DMSans-Regular", size: 14))
+                            .foregroundColor(Color(hex: "7a7f94"))
+                    }
+                    Button(action: { showLoadRoutes = true }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "folder.fill")
+                                .font(.system(size: 12))
+                            Text("Load Route")
+                                .font(.custom("DMSans-SemiBold", size: 13))
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(Color(hex: "c8893a"))
+                        .cornerRadius(8)
+                    }
+                    Spacer()
+                }
+            } else {
+                // Show loaded route name
+                HStack(spacing: 8) {
+                    Image(systemName: "folder.fill")
+                        .font(.system(size: 11))
+                        .foregroundColor(Color(hex: "c8893a"))
+                    Text(loadedRouteName)
+                        .font(.custom("DMSans-SemiBold", size: 12))
+                        .foregroundColor(Color(hex: "0f1117"))
+                        .lineLimit(1)
+                    Spacer()
+                    Button(action: { showLoadRoutes = true }) {
+                        Text("Change")
+                            .font(.custom("DMSans-Medium", size: 12))
+                            .foregroundColor(Color(hex: "c8893a"))
+                    }
+                }
+                .padding(.horizontal, 16).padding(.vertical, 8)
+                .background(Color.white)
+                .overlay(Rectangle().fill(Color(hex: "e2dfd6")).frame(height: 1), alignment: .bottom)
+
+                if showControls { controlBar }
+                RouteMapListView(
+                    route: $route,
+                    startCoord: startCoord,
+                    regionName: nil,
+                    startName: currentStartName,
+                    cameraPosition: $cameraPosition,
+                    isDirty: $isDirty,
+                    showFillData: false,
+                    onReset: {
+                        route = originalRoute
+                        isDirty = false
+                        cameraPosition = .automatic
+                    }
+                )
+            }
+        }
+    }
+
+    // MARK: - Manual Add Bar
+
+    private var manualAddBar: some View {
+        HStack(spacing: 12) {
+            Button(action: { showAddStop = true }) {
+                HStack(spacing: 6) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 13))
+                    Text("Add Stop")
+                        .font(.custom("DMSans-SemiBold", size: 13))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(Color(hex: "c8893a"))
+                .cornerRadius(8)
+            }
+
+            if !manualStops.isEmpty {
+                Button(action: {
+                    manualStops.removeAll()
+                    route = []; originalRoute = []; isDirty = false; cameraPosition = .automatic
+                }) {
+                    Text("Clear")
+                        .font(.custom("DMSans-SemiBold", size: 13))
+                        .foregroundColor(Color(hex: "c1121f"))
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(Color.white)
+                        .cornerRadius(8)
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: "e2dfd6"), lineWidth: 1))
+                }
+            }
+
+            Spacer()
+        }
+        .padding(.horizontal, 16).padding(.vertical, 8)
+        .background(Color(hex: "f5f4f0"))
     }
 
     // MARK: - Compact Summary Bar
@@ -308,6 +552,86 @@ struct RoutePlannerView: View {
         }
         return startLocationPresets.first { $0.id == selectedStartId }?.name ?? "Unknown"
     }
+
+    // MARK: - Manual Mode Logic
+
+    private func loadManualData() async {
+        manualLoading = true
+        do {
+            manualBusinesses = try await APIClient.shared.getBusinesses()
+            manualLocations = try await APIClient.shared.getAllLocationsIncludingInactive()
+        } catch { }
+        manualLoading = false
+    }
+
+    private func manualStopsToRoute() -> [RouteStop] {
+        manualStops.enumerated().map { idx, stop in
+            let locId: Int
+            let bizId: Int
+            if case .business(let bId, let lId) = stop.source {
+                bizId = bId; locId = lId
+            } else {
+                bizId = 0; locId = -(idx + 1)
+            }
+            let candidate = RouteCandidate(
+                id: locId, business_id: bizId,
+                address: stop.address, city: nil, state: nil, zip: nil, phone: nil,
+                estimated_gallons: nil, pickup_freq: nil,
+                latitude: stop.coordinate.latitude, longitude: stop.coordinate.longitude,
+                business_name: stop.name, business_status: nil,
+                region_id: nil, region_name: nil,
+                last_pickup_date: nil, collection_count: nil, total_collected: nil
+            )
+            return RouteStop(
+                id: locId, stopNumber: idx + 1,
+                candidate: candidate, coordinate: stop.coordinate,
+                fillLevel: 0, fillPercent: 0, daysSincePickup: 0, estimatedGallons: 0
+            )
+        }
+    }
+
+    // MARK: - Saved Route Logic
+
+    private func loadSavedRoute(_ savedRoute: SavedRoute) {
+        loadedRouteName = savedRoute.name
+
+        // Apply start location from saved route
+        if let sLat = savedRoute.start_lat, let sLng = savedRoute.start_lng {
+            startCoord = CLLocationCoordinate2D(latitude: sLat, longitude: sLng)
+            if let preset = startLocationPresets.first(where: { abs($0.coordinate.latitude - sLat) < 0.001 && abs($0.coordinate.longitude - sLng) < 0.001 }) {
+                selectedStartId = preset.id
+            } else {
+                selectedStartId = "saved"
+            }
+        }
+
+        guard let stops = savedRoute.stops, !stops.isEmpty else {
+            route = []; originalRoute = []; return
+        }
+
+        route = stops.enumerated().map { idx, stop in
+            let locId = stop.location_id ?? -(idx + 1)
+            let bizId = stop.business_id ?? 0
+            let candidate = RouteCandidate(
+                id: locId, business_id: bizId,
+                address: stop.address, city: nil, state: nil, zip: nil, phone: nil,
+                estimated_gallons: nil, pickup_freq: nil,
+                latitude: stop.latitude, longitude: stop.longitude,
+                business_name: stop.name, business_status: nil,
+                region_id: nil, region_name: nil,
+                last_pickup_date: nil, collection_count: nil, total_collected: nil
+            )
+            return RouteStop(
+                id: locId, stopNumber: idx + 1,
+                candidate: candidate,
+                coordinate: CLLocationCoordinate2D(latitude: stop.latitude, longitude: stop.longitude),
+                fillLevel: 0, fillPercent: 0, daysSincePickup: 0, estimatedGallons: 0
+            )
+        }
+        originalRoute = route
+        isDirty = false
+        cameraPosition = .automatic
+    }
 }
 
 // MARK: - Start Location Picker Sheet
@@ -402,14 +726,13 @@ struct RouteMapListView: View {
     let startName: String
     @Binding var cameraPosition: MapCameraPosition
     @Binding var isDirty: Bool
-    @Binding var showMap: Bool
+    var showFillData: Bool = true
     var onReset: (() -> Void)? = nil
     @State private var selectedStop: RouteStop?
     @State private var highlightedStopId: Int?
     @State private var showStartDetail = false
     @State private var selectedBusinessId: Int?
-    @State private var mapHeight: CGFloat = 250
-    @GestureState private var dragOffset: CGFloat = 0
+    @State private var showMapSheet = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -432,80 +755,36 @@ struct RouteMapListView: View {
                     .buttonStyle(.plain)
                 }
                 Spacer()
-                let totalGal = route.reduce(0) { $0 + $1.fillLevel }
-                Label("~\(Int(totalGal))g", systemImage: "drop.fill")
-                    .font(.custom("DMSans-SemiBold", size: 12))
-                    .foregroundColor(Color(hex: "c8893a"))
-                Text("·").foregroundColor(Color(hex: "e2dfd6"))
+                if showFillData {
+                    let totalGal = route.reduce(0) { $0 + $1.fillLevel }
+                    Label("~\(Int(totalGal))g", systemImage: "drop.fill")
+                        .font(.custom("DMSans-SemiBold", size: 12))
+                        .foregroundColor(Color(hex: "c8893a"))
+                    Text("·").foregroundColor(Color(hex: "e2dfd6"))
+                }
                 let totalMiles = totalRouteMiles()
                 Label(String(format: "%.1f mi", totalMiles), systemImage: "road.lanes")
                     .font(.custom("DMSans-SemiBold", size: 12))
                     .foregroundColor(Color(hex: "7a7f94"))
                 Text("·").foregroundColor(Color(hex: "e2dfd6"))
-                Button(action: { withAnimation(.easeInOut(duration: 0.2)) { showMap.toggle() } }) {
-                    Image(systemName: showMap ? "map.fill" : "map")
-                        .font(.system(size: 13))
-                        .foregroundColor(showMap ? Color(hex: "2d6a4f") : Color(hex: "7a7f94"))
+                Button(action: { showMapSheet = true }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "map.fill")
+                            .font(.system(size: 11))
+                        Text("Map")
+                            .font(.custom("DMSans-SemiBold", size: 11))
+                    }
+                    .foregroundColor(Color(hex: "2d6a4f"))
                 }
             }
             .padding(.horizontal, 16).padding(.vertical, 8)
             .background(Color(hex: "f5f4f0"))
 
-            // Map (collapsible)
-            if showMap {
-            Map(position: $cameraPosition) {
-                Annotation("Start", coordinate: startCoord) {
-                    Button(action: { showStartDetail = true }) {
-                        ZStack {
-                            Circle().fill(Color(hex: "0f1117")).frame(width: 28, height: 28)
-                            Image(systemName: "house.fill").font(.system(size: 12)).foregroundColor(.white)
-                        }
-                    }
-                }
-
-                ForEach(route) { stop in
-                    Annotation(stop.candidate.business_name ?? "", coordinate: stop.coordinate) {
-                        Button(action: { pinTapped(stop) }) {
-                            ZStack {
-                                Circle().fill(stopColor(stop)).frame(width: 30, height: 30)
-                                    .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
-                                Text("\(stop.stopNumber)").font(.custom("Syne-Bold", size: 13)).foregroundColor(.white)
-                            }
-                        }
-                    }
-                }
-
-                if route.count >= 1 {
-                    let coords = [startCoord] + route.map { $0.coordinate } + [startCoord]
-                    MapPolyline(coordinates: coords).stroke(Color(hex: "c8893a"), lineWidth: 3)
-                }
-
-                ForEach(Array(segmentDistances().enumerated()), id: \.offset) { _, seg in
-                    Annotation("", coordinate: seg.midpoint) {
-                        Text(seg.label)
-                            .font(.system(size: 9, weight: .bold, design: .rounded))
-                            .foregroundColor(Color(hex: "0f1117"))
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 2)
-                            .background(Color.white.opacity(0.9))
-                            .cornerRadius(4)
-                            .shadow(color: .black.opacity(0.1), radius: 2, y: 1)
-                    }
-                }
-            }
-            .mapStyle(.standard(elevation: .flat))
-            .mapControls { MapCompass(); MapScaleView() }
-            .frame(height: min(max(mapHeight + dragOffset, 120), 500))
-
-                // Resize handle
-                mapResizeHandle
-            }
-
             // Stop list with reorder + scroll-to support
             ScrollViewReader { proxy in
                 List {
                     ForEach(route) { stop in
-                        StopRow(stop: stop, onBusinessTap: { bizId in
+                        StopRow(stop: stop, showFillData: showFillData, onBusinessTap: { bizId in
                             selectedBusinessId = bizId
                         })
                             .id(stop.id)
@@ -556,35 +835,26 @@ struct RouteMapListView: View {
                 }
             }
         }
+        .sheet(isPresented: $showMapSheet) {
+            RouteMapSheet(
+                route: route,
+                startCoord: startCoord,
+                startName: startName,
+                showFillData: showFillData,
+                onStopTap: { stop in
+                    showMapSheet = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                        selectedStop = stop
+                    }
+                }
+            )
+        }
     }
 
     private func stopColor(_ stop: RouteStop) -> Color {
         if stop.fillPercent >= 1.5 { return Color(hex: "c1121f") }
         if stop.fillPercent >= 1.0 { return Color(hex: "c8893a") }
         return Color(hex: "2d6a4f")
-    }
-
-    private var mapResizeHandle: some View {
-        VStack(spacing: 0) {
-            RoundedRectangle(cornerRadius: 2)
-                .fill(Color(hex: "c8893a").opacity(0.5))
-                .frame(width: 40, height: 4)
-                .padding(.vertical, 6)
-        }
-        .frame(maxWidth: .infinity)
-        .background(Color(hex: "f5f4f0"))
-        .contentShape(Rectangle())
-        .gesture(
-            DragGesture()
-                .updating($dragOffset) { value, state, _ in
-                    state = value.translation.height
-                }
-                .onEnded { value in
-                    let newHeight = mapHeight + value.translation.height
-                    mapHeight = min(max(newHeight, 120), 500)
-                }
-        )
-        .overlay(Rectangle().fill(Color(hex: "e2dfd6")).frame(height: 1), alignment: .bottom)
     }
 
     private func pinTapped(_ stop: RouteStop) {
@@ -776,12 +1046,7 @@ struct StopNavigateSheet: View {
     }
 
     private func openInMaps() {
-        let placemark = MKPlacemark(coordinate: stop.coordinate)
-        let mapItem = MKMapItem(placemark: placemark)
-        mapItem.name = stop.candidate.business_name ?? "Collection Stop"
-        mapItem.openInMaps(launchOptions: [
-            MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDriving
-        ])
+        MapHelpers.openDirections(to: stop.coordinate, name: stop.candidate.business_name ?? "Collection Stop")
     }
 
     private func infoItem(icon: String, label: String, value: String, color: Color) -> some View {
@@ -894,12 +1159,7 @@ struct StartLocationDetailSheet: View {
     }
 
     private func openInMaps() {
-        let placemark = MKPlacemark(coordinate: coordinate)
-        let mapItem = MKMapItem(placemark: placemark)
-        mapItem.name = name
-        mapItem.openInMaps(launchOptions: [
-            MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDriving
-        ])
+        MapHelpers.openDirections(to: coordinate, name: name)
     }
 }
 
@@ -1125,12 +1385,13 @@ struct RouteEmptyView: View {
 
 struct StopRow: View {
     let stop: RouteStop
+    var showFillData: Bool = true
     var onBusinessTap: ((Int) -> Void)? = nil
 
     var body: some View {
         HStack(spacing: 14) {
             ZStack {
-                Circle().fill(badgeColor).frame(width: 32, height: 32)
+                Circle().fill(showFillData ? badgeColor : Color(hex: "2d6a4f")).frame(width: 32, height: 32)
                 Text("\(stop.stopNumber)").font(.custom("Syne-Bold", size: 14)).foregroundColor(.white)
             }
             VStack(alignment: .leading, spacing: 4) {
@@ -1143,16 +1404,18 @@ struct StopRow: View {
                 if !stop.addressLine.isEmpty {
                     Text(stop.addressLine).font(.custom("DMSans-Regular", size: 12)).foregroundColor(Color(hex: "7a7f94")).lineLimit(1)
                 }
-                HStack(spacing: 12) {
-                    HStack(spacing: 4) {
-                        fillGauge
-                        Text("\(Int(stop.fillLevel))/\(Int(routeContainerCapacity))g")
-                            .font(.custom("DMSans-SemiBold", size: 11)).foregroundColor(fillColor)
+                if showFillData {
+                    HStack(spacing: 12) {
+                        HStack(spacing: 4) {
+                            fillGauge
+                            Text("\(Int(stop.fillLevel))/\(Int(routeContainerCapacity))g")
+                                .font(.custom("DMSans-SemiBold", size: 11)).foregroundColor(fillColor)
+                        }
+                        Label("\(stop.daysSincePickup)d ago", systemImage: "clock")
+                            .font(.custom("DMSans-Regular", size: 11)).foregroundColor(Color(hex: "7a7f94"))
+                        Label("\(stop.estimatedGallons)g/wk", systemImage: "arrow.up.right")
+                            .font(.custom("DMSans-Regular", size: 11)).foregroundColor(Color(hex: "7a7f94"))
                     }
-                    Label("\(stop.daysSincePickup)d ago", systemImage: "clock")
-                        .font(.custom("DMSans-Regular", size: 11)).foregroundColor(Color(hex: "7a7f94"))
-                    Label("\(stop.estimatedGallons)g/wk", systemImage: "arrow.up.right")
-                        .font(.custom("DMSans-Regular", size: 11)).foregroundColor(Color(hex: "7a7f94"))
                 }
             }
             Spacer()
@@ -1258,4 +1521,130 @@ class LocationHelper: NSObject, ObservableObject, CLLocationManagerDelegate {
 
 #Preview {
     NavigationStack { RoutePlannerView() }.environmentObject(AuthManager())
+}
+
+// MARK: - Route Map Sheet
+
+struct RouteMapSheet: View {
+    let route: [RouteStop]
+    let startCoord: CLLocationCoordinate2D
+    let startName: String
+    var showFillData: Bool = true
+    var onStopTap: ((RouteStop) -> Void)? = nil
+
+    @Environment(\.dismiss) var dismiss
+    @State private var cameraPosition: MapCameraPosition = .automatic
+
+    var body: some View {
+        NavigationStack {
+            Map(position: $cameraPosition) {
+                Annotation("Start", coordinate: startCoord) {
+                    ZStack {
+                        Circle().fill(Color(hex: "0f1117")).frame(width: 28, height: 28)
+                        Image(systemName: "house.fill").font(.system(size: 12)).foregroundColor(.white)
+                    }
+                }
+
+                ForEach(route) { stop in
+                    Annotation(stop.candidate.business_name ?? "", coordinate: stop.coordinate) {
+                        Button(action: { onStopTap?(stop) }) {
+                            ZStack {
+                                Circle().fill(stopColor(stop)).frame(width: 30, height: 30)
+                                    .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
+                                Text("\(stop.stopNumber)").font(.custom("Syne-Bold", size: 13)).foregroundColor(.white)
+                            }
+                        }
+                    }
+                }
+
+                if route.count >= 1 {
+                    let coords = [startCoord] + route.map { $0.coordinate } + [startCoord]
+                    MapPolyline(coordinates: coords).stroke(Color(hex: "c8893a"), lineWidth: 3)
+                }
+
+                ForEach(Array(segmentDistances().enumerated()), id: \.offset) { _, seg in
+                    Annotation("", coordinate: seg.midpoint) {
+                        Text(seg.label)
+                            .font(.system(size: 9, weight: .bold, design: .rounded))
+                            .foregroundColor(Color(hex: "0f1117"))
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(Color.white.opacity(0.9))
+                            .cornerRadius(4)
+                            .shadow(color: .black.opacity(0.1), radius: 2, y: 1)
+                    }
+                }
+            }
+            .mapStyle(.standard(elevation: .flat))
+            .mapControls { MapCompass(); MapScaleView() }
+            .overlay(alignment: .bottom) {
+                // Stats overlay
+                HStack(spacing: 8) {
+                    Label("\(route.count) stops", systemImage: "mappin.circle.fill")
+                        .font(.custom("DMSans-SemiBold", size: 12))
+                        .foregroundColor(Color(hex: "2d6a4f"))
+                    if showFillData {
+                        Text("·").foregroundColor(.white.opacity(0.4))
+                        let totalGal = route.reduce(0) { $0 + $1.fillLevel }
+                        Label("~\(Int(totalGal))g", systemImage: "drop.fill")
+                            .font(.custom("DMSans-SemiBold", size: 12))
+                            .foregroundColor(Color(hex: "c8893a"))
+                    }
+                    Text("·").foregroundColor(.white.opacity(0.4))
+                    let totalMiles = totalRouteMiles()
+                    Label(String(format: "%.1f mi", totalMiles), systemImage: "road.lanes")
+                        .font(.custom("DMSans-SemiBold", size: 12))
+                        .foregroundColor(.white)
+                }
+                .padding(.horizontal, 16).padding(.vertical, 10)
+                .background(.ultraThinMaterial)
+                .cornerRadius(12)
+                .padding(.bottom, 12)
+            }
+            .navigationTitle("Route Map")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") { dismiss() }
+                        .font(.custom("DMSans-Medium", size: 14))
+                        .foregroundColor(Color(hex: "c8893a"))
+                }
+            }
+        }
+    }
+
+    private func stopColor(_ stop: RouteStop) -> Color {
+        guard showFillData else { return Color(hex: "2d6a4f") }
+        if stop.fillPercent >= 1.5 { return Color(hex: "c1121f") }
+        if stop.fillPercent >= 1.0 { return Color(hex: "c8893a") }
+        return Color(hex: "2d6a4f")
+    }
+
+    private func segmentDistances() -> [(midpoint: CLLocationCoordinate2D, label: String)] {
+        guard !route.isEmpty else { return [] }
+        var segments: [(midpoint: CLLocationCoordinate2D, label: String)] = []
+        let allCoords = [startCoord] + route.map { $0.coordinate } + [startCoord]
+        for i in 0..<(allCoords.count - 1) {
+            let from = allCoords[i]; let to = allCoords[i + 1]
+            let dist = RouteEngine.haversine(from: from, to: to) / 1609.344
+            if dist >= 0.1 {
+                let mid = CLLocationCoordinate2D(
+                    latitude: (from.latitude + to.latitude) / 2,
+                    longitude: (from.longitude + to.longitude) / 2
+                )
+                segments.append((midpoint: mid, label: String(format: "%.1f mi", dist)))
+            }
+        }
+        return segments
+    }
+
+    private func totalRouteMiles() -> Double {
+        guard !route.isEmpty else { return 0 }
+        let allCoords = [startCoord] + route.map { $0.coordinate } + [startCoord]
+        var total = 0.0
+        for i in 0..<(allCoords.count - 1) {
+            total += RouteEngine.haversine(from: allCoords[i], to: allCoords[i + 1])
+        }
+        return total / 1609.344
+    }
 }

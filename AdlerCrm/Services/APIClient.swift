@@ -1,4 +1,4 @@
-// AdlerCRM/Services/APIClient.swift  28/03/2026 19:03:37
+// AdlerCRM/Services/APIClient.swift  07/04/2026 19:36:19
 import Foundation
 
 class APIClient {
@@ -35,6 +35,7 @@ class APIClient {
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
         }
 
+        HMACSigner.sign(&request)
         let (data, response) = try await URLSession.shared.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
@@ -75,6 +76,7 @@ class APIClient {
             request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
         }
 
+        HMACSigner.sign(&request)
         let (data, response) = try await URLSession.shared.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
@@ -94,11 +96,20 @@ class APIClient {
     // MARK: - Auth Endpoints
 
     func login(username: String, password: String) async throws -> LoginResponse {
-        return try await request(
-            path: "/auth/login",
-            method: "POST",
-            body: ["username": username, "password": password]
-        )
+        guard let url = URL(string: "\(baseURL)/auth/login") else { throw APIClientError.invalidURL }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONSerialization.data(withJSONObject: ["username": username, "password": password])
+        HMACSigner.sign(&req)
+        let (data, response) = try await URLSession.shared.data(for: req)
+        guard let httpResp = response as? HTTPURLResponse else { throw APIClientError.invalidResponse }
+        // Decode response for 200, 401, and 429 (all return LoginResponse-shaped JSON)
+        if [200, 401, 429].contains(httpResp.statusCode) {
+            return try JSONDecoder().decode(LoginResponse.self, from: data)
+        }
+        if let err = try? JSONDecoder().decode(APIError.self, from: data) { throw APIClientError.serverError(err.error) }
+        throw APIClientError.serverError("HTTP \(httpResp.statusCode)")
     }
 
     func totpSetup(tempToken: String) async throws -> TOTPSetupResponse {
@@ -305,6 +316,7 @@ class APIClient {
 
         request.httpBody = body
 
+        HMACSigner.sign(&request)
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw APIClientError.invalidResponse
@@ -410,6 +422,184 @@ class APIClient {
 
     func getRouteCandidates() async throws -> [RouteCandidate] {
         return try await request(path: "/route-planner/candidates")
+    }
+
+    // MARK: - Business Notes
+
+    func getBusinessNotes(bizId: Int) async throws -> [BusinessNote] {
+        return try await request(path: "/business-notes/\(bizId)")
+    }
+
+    func createBusinessNote(bizId: Int, text: String) async throws -> BusinessNote {
+        return try await request(path: "/business-notes", method: "POST", body: [
+            "business_id": bizId,
+            "note_text": text
+        ])
+    }
+
+    func updateBusinessNote(id: Int, text: String) async throws -> BusinessNote {
+        return try await request(path: "/business-notes/\(id)", method: "PUT", body: [
+            "note_text": text
+        ])
+    }
+
+    func deleteBusinessNote(id: Int) async throws -> [String: Bool] {
+        return try await request(path: "/business-notes/\(id)", method: "DELETE")
+    }
+
+    // MARK: - Reports
+
+    func getCollectionSummary(bizId: Int, period: String = "all") async throws -> CollectionSummaryReport {
+        return try await request(path: "/report-gen/collection-summary/\(bizId)?period=\(period)")
+    }
+
+    func getPickupLog(bizId: Int, period: String = "all") async throws -> [PickupLogEntry] {
+        return try await request(path: "/report-gen/pickup-log/\(bizId)?period=\(period)")
+    }
+
+    func generateCollectionReport(bizId: Int, from: String?, to: String?) async throws -> GenerateReportResponse {
+        var body: [String: Any] = ["business_id": bizId]
+        if let from = from { body["from"] = from }
+        if let to = to { body["to"] = to }
+        return try await request(path: "/report-gen/collection", method: "POST", body: body)
+    }
+
+    func getReportHistory(bizId: Int) async throws -> [ReportHistoryEntry] {
+        return try await request(path: "/report-gen/history/\(bizId)")
+    }
+
+    func downloadReportPDF(reportName: String) async throws -> Data {
+        return try await requestData(path: "/report-gen/file/\(reportName)")
+    }
+
+    func deleteReports(ids: [Int]) async throws {
+        struct DeleteResponse: Codable { let ok: Bool? }
+        let body: [String: Any] = ["ids": ids]
+        let _: DeleteResponse = try await request(path: "/report-gen/delete", method: "POST", body: body)
+    }
+
+    // MARK: - Todos
+
+    func getTodos(date: String) async throws -> [TodoItem] {
+        return try await request(path: "/todos?date=\(date)")
+    }
+
+    func getTodoDateCounts(from: String, to: String) async throws -> [TodoDateCount] {
+        return try await request(path: "/todos/all?from=\(from)&to=\(to)")
+    }
+
+    func createTodo(title: String, description: String?, deadlineDate: String) async throws -> TodoItem {
+        var body: [String: Any] = ["title": title, "deadline_date": deadlineDate]
+        if let desc = description { body["description"] = desc }
+        return try await request(path: "/todos", method: "POST", body: body)
+    }
+
+    func updateTodo(id: Int, title: String, description: String?, deadlineDate: String) async throws -> TodoItem {
+        var body: [String: Any] = ["title": title, "deadline_date": deadlineDate]
+        if let desc = description { body["description"] = desc }
+        return try await request(path: "/todos/\(id)", method: "PUT", body: body)
+    }
+
+    func toggleTodo(id: Int) async throws -> TodoItem {
+        return try await request(path: "/todos/\(id)/toggle", method: "PUT", body: [:])
+    }
+
+    func deleteTodo(id: Int) async throws {
+        struct R: Codable { let ok: Bool? }
+        let _: R = try await request(path: "/todos/\(id)", method: "DELETE")
+    }
+
+    // MARK: - Notifications
+
+    func getNotifications() async throws -> [AppNotification] {
+        return try await request(path: "/notifications")
+    }
+
+    func getUnreadCount() async throws -> Int {
+        struct R: Codable { let count: Int }
+        let r: R = try await request(path: "/notifications/unread-count")
+        return r.count
+    }
+
+    func getNotificationUsers() async throws -> [NotificationUser] {
+        return try await request(path: "/notifications/users")
+    }
+
+    func sendNotification(toUserId: Int, message: String, priority: String) async throws -> AppNotification {
+        return try await request(path: "/notifications", method: "POST", body: [
+            "to_user_id": toUserId, "message": message, "priority": priority
+        ])
+    }
+
+    func markNotificationRead(id: Int) async throws {
+        struct R: Codable { let id: Int? }
+        let _: R = try await request(path: "/notifications/\(id)/read", method: "PUT", body: [:])
+    }
+
+    func markAllNotificationsRead() async throws {
+        struct R: Codable { let ok: Bool? }
+        let _: R = try await request(path: "/notifications/read-all", method: "PUT", body: [:])
+    }
+
+    func deleteNotification(id: Int) async throws {
+        struct R: Codable { let ok: Bool? }
+        let _: R = try await request(path: "/notifications/\(id)", method: "DELETE")
+    }
+
+    // MARK: - Corporate
+
+    func getCorporateDocuments() async throws -> [CorporateDocument] {
+        return try await request(path: "/corporate/documents")
+    }
+
+    func uploadCorporateDocument(fileData: Data, fileName: String, mimeType: String, docType: String, notes: String?) async throws -> CorporateDocument {
+        guard let url = URL(string: "\(baseURL)/corporate/documents/upload") else { throw APIClientError.invalidURL }
+        let boundary = UUID().uuidString
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        if let token = KeychainHelper.load(key: "adler_token") { req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
+        var body = Data()
+        body.append("--\(boundary)\r\nContent-Disposition: form-data; name=\"doc_type\"\r\n\r\n\(docType)\r\n")
+        if let notes = notes, !notes.isEmpty { body.append("--\(boundary)\r\nContent-Disposition: form-data; name=\"notes\"\r\n\r\n\(notes)\r\n") }
+        body.append("--\(boundary)\r\nContent-Disposition: form-data; name=\"file\"; filename=\"\(fileName)\"\r\nContent-Type: \(mimeType)\r\n\r\n")
+        body.append(fileData)
+        body.append("\r\n--\(boundary)--\r\n")
+        req.httpBody = body
+        HMACSigner.sign(&req)
+        let (data, response) = try await URLSession.shared.data(for: req)
+        guard let httpResp = response as? HTTPURLResponse else { throw APIClientError.invalidResponse }
+        if httpResp.statusCode == 401 { NotificationCenter.default.post(name: Notification.Name("adlerSessionExpired"), object: nil); throw APIClientError.unauthorized("Session expired") }
+        if httpResp.statusCode >= 400 { if let err = try? JSONDecoder().decode(APIError.self, from: data) { throw APIClientError.serverError(err.error) }; throw APIClientError.serverError("HTTP \(httpResp.statusCode)") }
+        return try JSONDecoder().decode(CorporateDocument.self, from: data)
+    }
+
+    func corporateFileURL(id: Int) -> URL? { URL(string: "\(baseURL)/corporate/documents/file/\(id)") }
+
+    func downloadCorporateFile(id: Int) async throws -> Data {
+        return try await requestData(path: "/corporate/documents/file/\(id)")
+    }
+
+    func deleteCorporateDocument(id: Int) async throws {
+        struct R: Codable { let ok: Bool? }
+        let _: R = try await request(path: "/corporate/documents/\(id)", method: "DELETE")
+    }
+
+    func getCorporateNotes() async throws -> [CorporateNote] {
+        return try await request(path: "/corporate/notes")
+    }
+
+    func createCorporateNote(text: String) async throws -> CorporateNote {
+        return try await request(path: "/corporate/notes", method: "POST", body: ["note_text": text])
+    }
+
+    func updateCorporateNote(id: Int, text: String) async throws -> CorporateNote {
+        return try await request(path: "/corporate/notes/\(id)", method: "PUT", body: ["note_text": text])
+    }
+
+    func deleteCorporateNote(id: Int) async throws {
+        struct R: Codable { let ok: Bool? }
+        let _: R = try await request(path: "/corporate/notes/\(id)", method: "DELETE")
     }
 
     // MARK: - Employee Endpoints

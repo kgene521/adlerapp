@@ -1,4 +1,4 @@
-// AdlerCRM/Views/CustomRouteView.swift  28/03/2026 21:36:41
+// /AdlerCRM/Views/CustomRouteView.swift  08/04/2026 00:51:00 EDT  02/04/2026 23:44:23
 import SwiftUI
 import MapKit
 import CoreLocation
@@ -36,8 +36,7 @@ struct CustomRouteView: View {
     @StateObject private var locationManager = LocationHelper()
 
     // Add stop
-    @State private var showAddBusiness = false
-    @State private var showAddManual = false
+    @State private var showAddStop = false
     @State private var showSaveRoute = false
     @State private var showLoadRoutes = false
 
@@ -50,6 +49,7 @@ struct CustomRouteView: View {
     @State private var cameraPosition: MapCameraPosition = .automatic
     @State private var selectedStop: CustomStop?
     @State private var showStartDetail = false
+    @State private var showCustomMap = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -138,8 +138,8 @@ struct CustomRouteView: View {
             .presentationDetents([.medium])
             .presentationDragIndicator(.visible)
         }
-        .sheet(isPresented: $showAddBusiness) {
-            AddBusinessStopSheet(
+        .sheet(isPresented: $showAddStop) {
+            AddStopSheet(
                 businesses: businesses,
                 locations: locations,
                 existingStopIds: existingLocationIds,
@@ -152,15 +152,6 @@ struct CustomRouteView: View {
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
         }
-        .sheet(isPresented: $showAddManual) {
-            AddManualStopSheet(onAdd: { stop in
-                stops.append(stop)
-                cameraPosition = .automatic
-                isDirty = true
-            })
-            .presentationDetents([.medium])
-            .presentationDragIndicator(.visible)
-        }
         .sheet(item: $selectedStop) { stop in
             CustomStopDetailSheet(stop: stop, startCoord: startCoord)
                 .presentationDetents([.medium])
@@ -170,6 +161,19 @@ struct CustomRouteView: View {
             StartLocationDetailSheet(name: currentStartName, coordinate: startCoord)
                 .presentationDetents([.medium])
                 .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showCustomMap) {
+            CustomRouteMapSheet(
+                stops: stops,
+                startCoord: startCoord,
+                startName: currentStartName,
+                onStopTap: { stop in
+                    showCustomMap = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                        selectedStop = stop
+                    }
+                }
+            )
         }
         .sheet(isPresented: $showSaveRoute) {
             SaveRouteSheet(
@@ -237,11 +241,11 @@ struct CustomRouteView: View {
 
     private var addStopBar: some View {
         HStack(spacing: 12) {
-            Button(action: { showAddBusiness = true }) {
+            Button(action: { showAddStop = true }) {
                 HStack(spacing: 6) {
-                    Image(systemName: "building.2.fill")
-                        .font(.system(size: 12))
-                    Text("Add Business")
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 13))
+                    Text("Add Stop")
                         .font(.custom("DMSans-SemiBold", size: 13))
                 }
                 .foregroundColor(.white)
@@ -251,31 +255,15 @@ struct CustomRouteView: View {
                 .cornerRadius(8)
             }
 
-            Button(action: { showAddManual = true }) {
-                HStack(spacing: 6) {
-                    Image(systemName: "mappin.and.ellipse")
-                        .font(.system(size: 12))
-                    Text("Add Address")
-                        .font(.custom("DMSans-SemiBold", size: 13))
-                }
-                .foregroundColor(Color(hex: "0f1117"))
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background(Color.white)
-                .cornerRadius(8)
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: "e2dfd6"), lineWidth: 1))
-            }
-
             Spacer()
         }
         .padding(16)
     }
 
-    // MARK: - Route Map
+    // MARK: - Route Stats Bar
 
     private var routeMap: some View {
         VStack(spacing: 0) {
-            // Stats bar
             HStack {
                 Label("\(stops.count) stops", systemImage: "mappin.circle.fill")
                     .font(.custom("DMSans-SemiBold", size: 12))
@@ -285,53 +273,19 @@ struct CustomRouteView: View {
                 Label(String(format: "%.1f mi total", totalMiles), systemImage: "road.lanes")
                     .font(.custom("DMSans-SemiBold", size: 12))
                     .foregroundColor(Color(hex: "7a7f94"))
+                Text("·").foregroundColor(Color(hex: "e2dfd6"))
+                Button(action: { showCustomMap = true }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "map.fill")
+                            .font(.system(size: 11))
+                        Text("Map")
+                            .font(.custom("DMSans-SemiBold", size: 11))
+                    }
+                    .foregroundColor(Color(hex: "2d6a4f"))
+                }
             }
             .padding(.horizontal, 16).padding(.vertical, 8)
             .background(Color(hex: "f5f4f0"))
-
-            Map(position: $cameraPosition) {
-                Annotation("Start", coordinate: startCoord) {
-                    Button(action: { showStartDetail = true }) {
-                        ZStack {
-                            Circle().fill(Color(hex: "0f1117")).frame(width: 28, height: 28)
-                            Image(systemName: "house.fill").font(.system(size: 12)).foregroundColor(.white)
-                        }
-                    }
-                }
-
-                ForEach(Array(stops.enumerated()), id: \.element.id) { idx, stop in
-                    Annotation(stop.name, coordinate: stop.coordinate) {
-                        Button(action: { selectedStop = stop }) {
-                            ZStack {
-                                Circle().fill(Color(hex: "c8893a")).frame(width: 30, height: 30)
-                                    .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
-                                Text("\(idx + 1)").font(.custom("Syne-Bold", size: 13)).foregroundColor(.white)
-                            }
-                        }
-                    }
-                }
-
-                if stops.count >= 1 {
-                    let coords = [startCoord] + stops.map { $0.coordinate } + [startCoord]
-                    MapPolyline(coordinates: coords).stroke(Color(hex: "c8893a"), lineWidth: 3)
-                }
-
-                ForEach(Array(segmentDistances().enumerated()), id: \.offset) { _, seg in
-                    Annotation("", coordinate: seg.midpoint) {
-                        Text(seg.label)
-                            .font(.system(size: 9, weight: .bold, design: .rounded))
-                            .foregroundColor(Color(hex: "0f1117"))
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 2)
-                            .background(Color.white.opacity(0.9))
-                            .cornerRadius(4)
-                            .shadow(color: .black.opacity(0.1), radius: 2, y: 1)
-                    }
-                }
-            }
-            .mapStyle(.standard(elevation: .flat))
-            .mapControls { MapCompass(); MapScaleView() }
-            .frame(height: 280)
         }
     }
 
@@ -610,38 +564,42 @@ struct CustomRouteView: View {
 
 // MARK: - Add Business Stop Sheet
 
-struct AddBusinessStopSheet: View {
+struct AddStopSheet: View {
     let businesses: [Business]
     let locations: [Location]
     let existingStopIds: Set<Int>
     let onAdd: (CustomStop) -> Void
 
     @Environment(\.dismiss) var dismiss
+    @State private var mode = 0  // 0 = Businesses, 1 = Manual
     @State private var searchText = ""
     @State private var filterRegion = "all"
     @State private var showInactive = false
 
+    // Manual entry fields
+    @State private var manualName = ""
+    @State private var manualAddress = ""
+    @State private var manualCity = ""
+    @State private var manualState = ""
+    @State private var manualLat = ""
+    @State private var manualLng = ""
+    @State private var manualError = ""
+    @State private var geocoding = false
+
     private var filteredLocations: [Location] {
         locations.filter { loc in
-            // Skip locations without coordinates
             guard loc.latitude != nil, loc.longitude != nil else { return false }
-            // Skip already added
             if existingStopIds.contains(loc.id) { return false }
-            // Inactive filter
             if !showInactive && loc.is_deleted == true { return false }
-            // Search
             if !searchText.isEmpty {
                 let bizName = loc.business_name ?? ""
                 let addr = [loc.address, loc.city, loc.state].compactMap { $0 }.joined(separator: " ")
                 let combined = "\(bizName) \(addr)"
                 if !combined.localizedCaseInsensitiveContains(searchText) { return false }
             }
-            // Region filter
             if filterRegion != "all" {
                 let biz = businesses.first { $0.id == loc.business_id }
-                if filterRegion == "none" {
-                    if biz?.region_id != nil { return false }
-                } else if let regionId = Int(filterRegion) {
+                if let regionId = Int(filterRegion) {
                     if biz?.region_id != regionId { return false }
                 }
             }
@@ -658,97 +616,43 @@ struct AddBusinessStopSheet: View {
                 seen.insert(rid)
             }
         }
-        if businesses.contains(where: { $0.region_id == nil }) {
-            result.append(("none", "Unassigned"))
-        }
         return result
+    }
+
+    private var manualHasAddress: Bool {
+        !manualAddress.trimmingCharacters(in: .whitespaces).isEmpty &&
+        !manualCity.trimmingCharacters(in: .whitespaces).isEmpty &&
+        !manualState.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    private var manualHasCoords: Bool {
+        !manualLat.isEmpty && !manualLng.isEmpty
+    }
+
+    private var manualCanAdd: Bool {
+        manualHasAddress || manualHasCoords
     }
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // Region filter
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(regionNames, id: \.id) { region in
-                            Button(action: { filterRegion = region.id }) {
-                                Text(region.name)
-                                    .font(.custom("DMSans-SemiBold", size: 12))
-                                    .foregroundColor(filterRegion == region.id ? .white : Color(hex: "3a3d4a"))
-                                    .padding(.horizontal, 14)
-                                    .padding(.vertical, 7)
-                                    .background(filterRegion == region.id ? Color(hex: "c8893a") : Color.white)
-                                    .cornerRadius(50)
-                                    .overlay(RoundedRectangle(cornerRadius: 50).stroke(filterRegion == region.id ? Color.clear : Color(hex: "e2dfd6"), lineWidth: 1))
-                            }
-                            .buttonStyle(.plain)
-                        }
-
-                        Toggle(isOn: $showInactive) {
-                            Text("Inactive")
-                                .font(.custom("DMSans-Medium", size: 11))
-                                .foregroundColor(Color(hex: "7a7f94"))
-                        }
-                        .toggleStyle(.switch)
-                        .controlSize(.mini)
-                        .tint(Color(hex: "c8893a"))
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
+                // Segmented control
+                Picker("Mode", selection: $mode) {
+                    Text("Businesses").tag(0)
+                    Text("Manual Address").tag(1)
                 }
+                .pickerStyle(.segmented)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
                 .background(Color(hex: "f5f4f0"))
 
-                // Location list
-                List {
-                    ForEach(filteredLocations) { loc in
-                        Button(action: { addLocation(loc) }) {
-                            HStack(spacing: 12) {
-                                Image(systemName: "plus.circle.fill")
-                                    .font(.system(size: 18))
-                                    .foregroundColor(Color(hex: "2d6a4f"))
-
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(loc.business_name ?? "Unknown")
-                                        .font(.custom("DMSans-SemiBold", size: 14))
-                                        .foregroundColor(Color(hex: "0f1117"))
-                                        .lineLimit(1)
-                                    let addr = [loc.address, loc.city, loc.state]
-                                        .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: ", ")
-                                    if !addr.isEmpty {
-                                        Text(addr)
-                                            .font(.custom("DMSans-Regular", size: 12))
-                                            .foregroundColor(Color(hex: "7a7f94"))
-                                            .lineLimit(1)
-                                    }
-                                }
-
-                                Spacer()
-
-                                if loc.is_deleted == true {
-                                    Text("Inactive")
-                                        .font(.custom("DMSans-SemiBold", size: 9))
-                                        .foregroundColor(Color(hex: "7a7f94"))
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 2)
-                                        .background(Color(hex: "e2dfd6"))
-                                        .cornerRadius(50)
-                                }
-
-                                if let gal = loc.estimated_gallons, gal > 0 {
-                                    Text("\(gal)g")
-                                        .font(.custom("DMSans-Medium", size: 11))
-                                        .foregroundColor(Color(hex: "2d6a4f"))
-                                }
-                            }
-                            .opacity(loc.is_deleted == true ? 0.5 : 1)
-                        }
-                        .buttonStyle(.plain)
-                    }
+                if mode == 0 {
+                    businessSearchView
+                } else {
+                    manualEntryView
                 }
-                .listStyle(.plain)
             }
-            .searchable(text: $searchText, prompt: "Search by business or address")
-            .navigationTitle("Add Business Stop")
+            .navigationTitle("Add Stop")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -760,121 +664,196 @@ struct AddBusinessStopSheet: View {
         }
     }
 
-    private func addLocation(_ loc: Location) {
-        guard let lat = loc.latitude, let lng = loc.longitude else { return }
-        let addr = [loc.address, loc.city, loc.state]
-            .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: ", ")
-        let stop = CustomStop(
-            name: loc.business_name ?? "Unknown",
-            address: addr.isEmpty ? "No address" : addr,
-            coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lng),
-            source: .business(businessId: loc.business_id, locationId: loc.id)
-        )
-        onAdd(stop)
-    }
-}
+    // MARK: - Business Search View
 
-// MARK: - Add Manual Stop Sheet
-
-struct AddManualStopSheet: View {
-    let onAdd: (CustomStop) -> Void
-
-    @Environment(\.dismiss) var dismiss
-    @State private var name = ""
-    @State private var address = ""
-    @State private var city = ""
-    @State private var state = ""
-    @State private var latitude = ""
-    @State private var longitude = ""
-    @State private var errorMsg = ""
-    @State private var geocoding = false
-
-    private var hasAddress: Bool {
-        !address.trimmingCharacters(in: .whitespaces).isEmpty &&
-        !city.trimmingCharacters(in: .whitespaces).isEmpty &&
-        !state.trimmingCharacters(in: .whitespaces).isEmpty
-    }
-
-    private var hasCoords: Bool {
-        !latitude.isEmpty && !longitude.isEmpty
-    }
-
-    private var canAdd: Bool {
-        hasAddress || hasCoords
-    }
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 16) {
-                    if !errorMsg.isEmpty {
-                        Text(errorMsg)
-                            .font(.custom("DMSans-Regular", size: 13))
-                            .foregroundColor(Color(hex: "c1121f"))
-                            .padding(12)
-                            .frame(maxWidth: .infinity)
-                            .background(Color(hex: "ffe5e7"))
-                            .cornerRadius(8)
-                    }
-
-                    formField(label: "Stop Name", text: $name, placeholder: "e.g. Drop-off Point A (optional)")
-                    formField(label: "Street Address", text: $address, placeholder: "123 Main St")
-
-                    HStack(spacing: 10) {
-                        formField(label: "City", text: $city, placeholder: "City")
-                        formField(label: "State", text: $state, placeholder: "VA")
-                            .frame(width: 60)
-                    }
-
-                    // Divider with "or"
-                    HStack {
-                        Rectangle().fill(Color(hex: "e2dfd6")).frame(height: 1)
-                        Text("or enter coordinates")
-                            .font(.custom("DMSans-Regular", size: 11))
-                            .foregroundColor(Color(hex: "7a7f94"))
-                            .layoutPriority(1)
-                        Rectangle().fill(Color(hex: "e2dfd6")).frame(height: 1)
-                    }
-                    .padding(.vertical, 4)
-
-                    HStack(spacing: 10) {
-                        formField(label: "Latitude", text: $latitude, placeholder: "e.g. 37.2710", keyboard: .numbersAndPunctuation)
-                        formField(label: "Longitude", text: $longitude, placeholder: "e.g. -79.9414", keyboard: .numbersAndPunctuation)
-                    }
-
-                    Text("Provide either a full address (street, city, state) or coordinates. If both are provided, coordinates take priority.")
-                        .font(.custom("DMSans-Regular", size: 11))
-                        .foregroundColor(Color(hex: "7a7f94"))
-                        .padding(.top, 4)
-                }
-                .padding(20)
-            }
-            .background(Color(hex: "f5f4f0"))
-            .navigationTitle("Add Manual Stop")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") { dismiss() }
-                        .font(.custom("DMSans-Regular", size: 14))
-                        .foregroundColor(Color(hex: "7a7f94"))
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: addStop) {
-                        if geocoding {
-                            ProgressView().scaleEffect(0.8)
-                        } else {
-                            Text("Add")
-                                .font(.custom("DMSans-SemiBold", size: 14))
+    private var businessSearchView: some View {
+        VStack(spacing: 0) {
+            // Region filter
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(regionNames, id: \.id) { region in
+                        Button(action: { filterRegion = region.id }) {
+                            Text(region.name)
+                                .font(.custom("DMSans-SemiBold", size: 12))
+                                .foregroundColor(filterRegion == region.id ? .white : Color(hex: "3a3d4a"))
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 7)
+                                .background(filterRegion == region.id ? Color(hex: "c8893a") : Color.white)
+                                .cornerRadius(50)
+                                .overlay(RoundedRectangle(cornerRadius: 50).stroke(filterRegion == region.id ? Color.clear : Color(hex: "e2dfd6"), lineWidth: 1))
                         }
+                        .buttonStyle(.plain)
                     }
-                    .foregroundColor(Color(hex: "2d6a4f"))
-                    .disabled(!canAdd || geocoding)
+
+                    Toggle(isOn: $showInactive) {
+                        Text("Inactive")
+                            .font(.custom("DMSans-Medium", size: 11))
+                            .foregroundColor(Color(hex: "7a7f94"))
+                    }
+                    .toggleStyle(.switch)
+                    .controlSize(.mini)
+                    .tint(Color(hex: "c8893a"))
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+            }
+            .background(Color(hex: "f5f4f0").opacity(0.5))
+
+            // Search bar
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 14))
+                    .foregroundColor(Color(hex: "7a7f94"))
+                TextField("Search by name, address, or city", text: $searchText)
+                    .font(.custom("DMSans-Regular", size: 14))
+                    .foregroundColor(Color(hex: "0f1117"))
+                if !searchText.isEmpty {
+                    Button(action: { searchText = "" }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 14))
+                            .foregroundColor(Color(hex: "7a7f94"))
+                    }
+                    .buttonStyle(.plain)
                 }
             }
+            .padding(10)
+            .background(Color.white)
+            .cornerRadius(8)
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: "e2dfd6"), lineWidth: 1))
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+
+            // Results count
+            HStack {
+                Text("\(filteredLocations.count) location\(filteredLocations.count == 1 ? "" : "s")")
+                    .font(.custom("DMSans-Regular", size: 11))
+                    .foregroundColor(Color(hex: "7a7f94"))
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 4)
+
+            // Location list
+            List {
+                ForEach(filteredLocations) { loc in
+                    Button(action: { addLocation(loc) }) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.system(size: 18))
+                                .foregroundColor(Color(hex: "2d6a4f"))
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(loc.business_name ?? "Unknown")
+                                    .font(.custom("DMSans-SemiBold", size: 14))
+                                    .foregroundColor(Color(hex: "0f1117"))
+                                    .lineLimit(1)
+                                let addr = [loc.address, loc.city, loc.state]
+                                    .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: ", ")
+                                if !addr.isEmpty {
+                                    Text(addr)
+                                        .font(.custom("DMSans-Regular", size: 12))
+                                        .foregroundColor(Color(hex: "7a7f94"))
+                                        .lineLimit(1)
+                                }
+                            }
+
+                            Spacer()
+
+                            if loc.is_deleted == true {
+                                Text("Inactive")
+                                    .font(.custom("DMSans-SemiBold", size: 9))
+                                    .foregroundColor(Color(hex: "7a7f94"))
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Color(hex: "e2dfd6"))
+                                    .cornerRadius(50)
+                            }
+
+                            if let gal = loc.estimated_gallons, gal > 0 {
+                                Text("\(gal)g")
+                                    .font(.custom("DMSans-Medium", size: 11))
+                                    .foregroundColor(Color(hex: "2d6a4f"))
+                            }
+                        }
+                        .opacity(loc.is_deleted == true ? 0.5 : 1)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .listStyle(.plain)
         }
     }
 
-    private func formField(label: String, text: Binding<String>, placeholder: String, keyboard: UIKeyboardType = .default) -> some View {
+    // MARK: - Manual Entry View
+
+    private var manualEntryView: some View {
+        ScrollView {
+            VStack(spacing: 16) {
+                if !manualError.isEmpty {
+                    Text(manualError)
+                        .font(.custom("DMSans-Regular", size: 13))
+                        .foregroundColor(Color(hex: "c1121f"))
+                        .padding(12)
+                        .frame(maxWidth: .infinity)
+                        .background(Color(hex: "ffe5e7"))
+                        .cornerRadius(8)
+                }
+
+                manualField(label: "Stop Name", text: $manualName, placeholder: "e.g. Drop-off Point A (optional)")
+                manualField(label: "Street Address", text: $manualAddress, placeholder: "123 Main St")
+
+                HStack(spacing: 10) {
+                    manualField(label: "City", text: $manualCity, placeholder: "City")
+                    manualField(label: "State", text: $manualState, placeholder: "VA")
+                        .frame(width: 60)
+                }
+
+                HStack {
+                    Rectangle().fill(Color(hex: "e2dfd6")).frame(height: 1)
+                    Text("or enter coordinates")
+                        .font(.custom("DMSans-Regular", size: 11))
+                        .foregroundColor(Color(hex: "7a7f94"))
+                        .layoutPriority(1)
+                    Rectangle().fill(Color(hex: "e2dfd6")).frame(height: 1)
+                }
+                .padding(.vertical, 4)
+
+                HStack(spacing: 10) {
+                    manualField(label: "Latitude", text: $manualLat, placeholder: "e.g. 37.2710", keyboard: .numbersAndPunctuation)
+                    manualField(label: "Longitude", text: $manualLng, placeholder: "e.g. -79.9414", keyboard: .numbersAndPunctuation)
+                }
+
+                Text("Provide either a full address (street, city, state) or coordinates. If both are provided, coordinates take priority.")
+                    .font(.custom("DMSans-Regular", size: 11))
+                    .foregroundColor(Color(hex: "7a7f94"))
+                    .padding(.top, 4)
+
+                Button(action: addManualStop) {
+                    HStack {
+                        if geocoding {
+                            ProgressView().tint(.white)
+                        } else {
+                            Image(systemName: "plus.circle.fill")
+                            Text("Add Stop")
+                                .font(.custom("DMSans-SemiBold", size: 15))
+                        }
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(manualCanAdd && !geocoding ? Color(hex: "2d6a4f") : Color(hex: "7a7f94"))
+                    .cornerRadius(12)
+                }
+                .disabled(!manualCanAdd || geocoding)
+            }
+            .padding(20)
+        }
+        .background(Color(hex: "f5f4f0"))
+    }
+
+    // MARK: - Helpers
+
+    private func manualField(label: String, text: Binding<String>, placeholder: String, keyboard: UIKeyboardType = .default) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label.uppercased())
                 .font(.custom("DMSans-SemiBold", size: 9))
@@ -890,18 +869,30 @@ struct AddManualStopSheet: View {
         }
     }
 
-    private func addStop() {
-        errorMsg = ""
-        let addrParts = [address, city, state].filter { !$0.isEmpty }
-        let addrString = addrParts.joined(separator: ", ")
-        let stopName = name.trimmingCharacters(in: .whitespaces).isEmpty
-            ? (addrString.isEmpty ? "Manual Stop" : addrString)
-            : name.trimmingCharacters(in: .whitespaces)
+    private func addLocation(_ loc: Location) {
+        guard let lat = loc.latitude, let lng = loc.longitude else { return }
+        let addr = [loc.address, loc.city, loc.state]
+            .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: ", ")
+        let stop = CustomStop(
+            name: loc.business_name ?? "Unknown",
+            address: addr.isEmpty ? "No address" : addr,
+            coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lng),
+            source: .business(businessId: loc.business_id, locationId: loc.id)
+        )
+        onAdd(stop)
+    }
 
-        // If coordinates are provided, use them directly
-        if hasCoords {
-            guard let lat = Double(latitude), let lng = Double(longitude) else {
-                errorMsg = "Please enter valid latitude and longitude values."
+    private func addManualStop() {
+        manualError = ""
+        let addrParts = [manualAddress, manualCity, manualState].filter { !$0.isEmpty }
+        let addrString = addrParts.joined(separator: ", ")
+        let stopName = manualName.trimmingCharacters(in: .whitespaces).isEmpty
+            ? (addrString.isEmpty ? "Manual Stop" : addrString)
+            : manualName.trimmingCharacters(in: .whitespaces)
+
+        if manualHasCoords {
+            guard let lat = Double(manualLat), let lng = Double(manualLng) else {
+                manualError = "Please enter valid latitude and longitude values."
                 return
             }
             let stop = CustomStop(
@@ -915,9 +906,8 @@ struct AddManualStopSheet: View {
             return
         }
 
-        // Geocode the address
-        guard hasAddress else {
-            errorMsg = "Please enter a full address (street, city, state) or coordinates."
+        guard manualHasAddress else {
+            manualError = "Please enter a full address (street, city, state) or coordinates."
             return
         }
 
@@ -927,11 +917,11 @@ struct AddManualStopSheet: View {
             DispatchQueue.main.async {
                 geocoding = false
                 if let error = error {
-                    errorMsg = "Could not find coordinates for this address: \(error.localizedDescription)"
+                    manualError = "Could not find coordinates: \(error.localizedDescription)"
                     return
                 }
                 guard let location = placemarks?.first?.location else {
-                    errorMsg = "No matching location found for this address. Please check the address or enter coordinates manually."
+                    manualError = "No matching location found. Please check the address or enter coordinates manually."
                     return
                 }
                 let stop = CustomStop(
@@ -1055,12 +1045,7 @@ struct CustomStopDetailSheet: View {
     }
 
     private func openInMaps() {
-        let placemark = MKPlacemark(coordinate: stop.coordinate)
-        let mapItem = MKMapItem(placemark: placemark)
-        mapItem.name = stop.name
-        mapItem.openInMaps(launchOptions: [
-            MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDriving
-        ])
+        MapHelpers.openDirections(to: stop.coordinate, name: stop.name)
     }
 }
 
@@ -1519,7 +1504,7 @@ struct LoadRoutesSheet: View {
                     }
                     .listStyle(.plain)
                 }
-            }
+                }
             .searchable(text: $searchText, prompt: "Search by route name")
             .navigationTitle("Saved Routes")
             .navigationBarTitleDisplayMode(.inline)
@@ -1612,6 +1597,85 @@ struct LoadRoutesSheet: View {
         let fmt = DateFormatter()
         fmt.dateFormat = "MMM d, yyyy h:mm a"
         return fmt.string(from: date)
+    }
+}
+
+// MARK: - Custom Route Map Sheet
+
+struct CustomRouteMapSheet: View {
+    let stops: [CustomStop]
+    let startCoord: CLLocationCoordinate2D
+    let startName: String
+    var onStopTap: ((CustomStop) -> Void)? = nil
+
+    @Environment(\.dismiss) var dismiss
+    @State private var cameraPosition: MapCameraPosition = .automatic
+
+    var body: some View {
+        NavigationStack {
+            Map(position: $cameraPosition) {
+                Annotation("Start", coordinate: startCoord) {
+                    ZStack {
+                        Circle().fill(Color(hex: "0f1117")).frame(width: 28, height: 28)
+                        Image(systemName: "house.fill").font(.system(size: 12)).foregroundColor(.white)
+                    }
+                }
+
+                ForEach(Array(stops.enumerated()), id: \.element.id) { idx, stop in
+                    Annotation(stop.name, coordinate: stop.coordinate) {
+                        Button(action: { onStopTap?(stop) }) {
+                            ZStack {
+                                Circle().fill(Color(hex: "c8893a")).frame(width: 30, height: 30)
+                                    .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
+                                Text("\(idx + 1)").font(.custom("Syne-Bold", size: 13)).foregroundColor(.white)
+                            }
+                        }
+                    }
+                }
+
+                if stops.count >= 1 {
+                    let coords = [startCoord] + stops.map { $0.coordinate } + [startCoord]
+                    MapPolyline(coordinates: coords).stroke(Color(hex: "c8893a"), lineWidth: 3)
+                }
+            }
+            .mapStyle(.standard(elevation: .flat))
+            .mapControls { MapCompass(); MapScaleView() }
+            .overlay(alignment: .bottom) {
+                HStack(spacing: 8) {
+                    Label("\(stops.count) stops", systemImage: "mappin.circle.fill")
+                        .font(.custom("DMSans-SemiBold", size: 12))
+                        .foregroundColor(Color(hex: "2d6a4f"))
+                    Text("·").foregroundColor(.white.opacity(0.4))
+                    let totalMiles = totalRouteMiles()
+                    Label(String(format: "%.1f mi", totalMiles), systemImage: "road.lanes")
+                        .font(.custom("DMSans-SemiBold", size: 12))
+                        .foregroundColor(.white)
+                }
+                .padding(.horizontal, 16).padding(.vertical, 10)
+                .background(.ultraThinMaterial)
+                .cornerRadius(12)
+                .padding(.bottom, 12)
+            }
+            .navigationTitle("Route Map")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") { dismiss() }
+                        .font(.custom("DMSans-Medium", size: 14))
+                        .foregroundColor(Color(hex: "c8893a"))
+                }
+            }
+        }
+    }
+
+    private func totalRouteMiles() -> Double {
+        guard !stops.isEmpty else { return 0 }
+        let allCoords = [startCoord] + stops.map { $0.coordinate } + [startCoord]
+        var total = 0.0
+        for i in 0..<(allCoords.count - 1) {
+            total += RouteEngine.haversine(from: allCoords[i], to: allCoords[i + 1])
+        }
+        return total / 1609.344
     }
 }
 

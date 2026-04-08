@@ -1,4 +1,4 @@
-// AdlerCRM/Views/BusinessListView.swift  28/03/2026 17:20:30
+// AdlerCRM/Views/BusinessListView.swift  07/04/2026 20:28:49
 import SwiftUI
 import Combine
 
@@ -33,12 +33,9 @@ struct BusinessListView: View {
             if !showInactive && b.status == "inactive" { return false }
 
             if !searchText.isEmpty {
-                if let regex = try? NSRegularExpression(pattern: searchText, options: .caseInsensitive) {
-                    let range = NSRange(location: 0, length: (b.name).utf16.count)
-                    if regex.firstMatch(in: b.name, range: range) == nil { return false }
-                } else {
-                    if !b.name.localizedCaseInsensitiveContains(searchText) { return false }
-                }
+                let searchable = [b.name, b.first_address, b.first_city]
+                    .compactMap { $0 }.joined(separator: " ")
+                if !searchable.localizedCaseInsensitiveContains(searchText) { return false }
             }
 
             if filterRegion == "__none__" && b.region_id != nil { return false }
@@ -105,7 +102,7 @@ struct BusinessListView: View {
                 }
             }
         }
-        .searchable(text: $searchText, prompt: "Search by name (regex supported)")
+        .searchable(text: $searchText, prompt: "Search by name, address, or city")
         .task { await loadDataAsync() }
         .sheet(isPresented: $showAddSheet) {
             AddBusinessSheet(regions: regions, onSave: loadData)
@@ -404,18 +401,17 @@ struct BusinessDetailView: View {
     let canManageRegions: Bool
     let onUpdate: () -> Void
 
-    @State private var selectedRegionId: Int?
-    @State private var saving = false
     @State private var errorMsg = ""
     @State private var showEditSheet = false
     @State private var showAddLocation = false
     @State private var showDeactivateConfirm = false
     @State private var locations: [Location] = []
     @State private var locationsLoading = true
+    @State private var showDeletedLocations = false
     @State private var contacts: [BusinessContact] = []
     @State private var contactsLoading = true
-    @State private var events: [ContactEvent] = []
-    @State private var eventsLoading = true
+    @State private var notes: [BusinessNote] = []
+    @State private var notesLoading = true
     @State private var collections: [Collection] = []
     @State private var collectionsLoading = true
     @State private var documents: [BusinessDocument] = []
@@ -423,35 +419,173 @@ struct BusinessDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 16) {
-                // Header card
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
+            VStack(spacing: 12) {
+                // Compact header
+                HStack {
+                    VStack(alignment: .leading, spacing: 3) {
                         Text(business.name)
-                            .font(.custom("Syne-ExtraBold", size: 22))
+                            .font(.custom("Syne-ExtraBold", size: 20))
+                            .foregroundColor(Color(hex: "0f1117"))
+                        HStack(spacing: 6) {
+                            Image(systemName: "map.circle.fill")
+                                .font(.system(size: 11))
+                                .foregroundColor(Color(hex: "c8893a"))
+                            Text(business.region_name ?? "Unassigned")
+                                .font(.custom("DMSans-Medium", size: 12))
+                                .foregroundColor(Color(hex: "7a7f94"))
+                        }
+                    }
+                    Spacer()
+                    Text(business.status ?? "active")
+                        .font(.custom("DMSans-SemiBold", size: 10))
+                        .foregroundColor(business.status == "active" ? Color(hex: "2d6a4f") : Color(hex: "7a7f94"))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(business.status == "active" ? Color(hex: "d8f3dc") : Color(hex: "e2dfd6"))
+                        .cornerRadius(50)
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .padding(.bottom, 4)
+
+                // 1. Notes
+                NotesSection(
+                    notes: notes,
+                    loading: notesLoading,
+                    businessId: business.id,
+                    onReload: loadNotes
+                )
+
+                // 2. Locations
+                VStack(alignment: .leading, spacing: 8) {
+                    let activeLocations = locations.filter { $0.is_deleted != true }
+                    let deletedLocations = locations.filter { $0.is_deleted == true }
+
+                    HStack {
+                        Label("Locations", systemImage: "mappin.circle.fill")
+                            .font(.custom("Syne-Bold", size: 15))
                             .foregroundColor(Color(hex: "0f1117"))
                         Spacer()
-                        Text(business.status ?? "active")
+                        Text("\(activeLocations.count)")
                             .font(.custom("DMSans-SemiBold", size: 11))
-                            .foregroundColor(business.status == "active" ? Color(hex: "2d6a4f") : Color(hex: "7a7f94"))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 4)
-                            .background(business.status == "active" ? Color(hex: "d8f3dc") : Color(hex: "e2dfd6"))
+                            .foregroundColor(Color(hex: "2d6a4f"))
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 2)
+                            .background(Color(hex: "d8f3dc"))
                             .cornerRadius(50)
+                        if !deletedLocations.isEmpty {
+                            Button(action: { withAnimation { showDeletedLocations.toggle() } }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "trash")
+                                        .font(.system(size: 10))
+                                    Text("\(deletedLocations.count)")
+                                        .font(.custom("DMSans-SemiBold", size: 10))
+                                }
+                                .foregroundColor(showDeletedLocations ? .white : Color(hex: "7a7f94"))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(showDeletedLocations ? Color(hex: "c1121f").opacity(0.7) : Color(hex: "e2dfd6"))
+                                .cornerRadius(50)
+                            }
+                        }
+                        Button(action: { showAddLocation = true }) {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.system(size: 18))
+                                .foregroundColor(Color(hex: "c8893a"))
+                        }
                     }
 
-                    Divider()
+                    if locationsLoading {
+                        ProgressView().frame(maxWidth: .infinity, alignment: .center).padding(.vertical, 8)
+                    } else if activeLocations.isEmpty && !showDeletedLocations {
+                        Text("No active locations.")
+                            .font(.custom("DMSans-Regular", size: 13))
+                            .foregroundColor(Color(hex: "7a7f94"))
+                            .padding(.vertical, 4)
+                    } else {
+                        // Active locations
+                        if !activeLocations.isEmpty {
+                            VStack(spacing: 0) {
+                                ForEach(activeLocations) { loc in
+                                    NavigationLink(destination: LocationDetailView(location: loc, businessName: business.name, onUpdate: reloadLocations)) {
+                                        LocationRow(location: loc)
+                                    }
+                                    if loc.id != activeLocations.last?.id {
+                                        Divider().padding(.leading, 36)
+                                    }
+                                }
+                            }
+                        }
 
-                    // Info grid
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                        // Deleted locations (collapsible)
+                        if showDeletedLocations && !deletedLocations.isEmpty {
+                            Divider().padding(.vertical, 4)
+                            HStack(spacing: 6) {
+                                Image(systemName: "trash")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(Color(hex: "c1121f"))
+                                Text("DELETED (\(deletedLocations.count))")
+                                    .font(.custom("DMSans-SemiBold", size: 10))
+                                    .foregroundColor(Color(hex: "c1121f"))
+                                    .tracking(0.4)
+                                Spacer()
+                            }
+                            .padding(.top, 4)
+
+                            VStack(spacing: 0) {
+                                ForEach(deletedLocations) { loc in
+                                    NavigationLink(destination: LocationDetailView(location: loc, businessName: business.name, onUpdate: reloadLocations)) {
+                                        LocationRow(location: loc)
+                                    }
+                                    if loc.id != deletedLocations.last?.id {
+                                        Divider().padding(.leading, 36)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(16)
+                .background(Color.white)
+                .cornerRadius(14)
+                .shadow(color: Color.black.opacity(0.04), radius: 6, y: 2)
+                .sheet(isPresented: $showAddLocation) {
+                    AddLocationSheet(businessId: business.id, onSave: reloadLocations)
+                }
+
+                // 3. Collections
+                CollectionsSection(
+                    collections: collections,
+                    loading: collectionsLoading,
+                    locations: locations,
+                    onReload: loadCollectionsAndDocs
+                )
+
+                // 4. Contacts
+                ContactsSection(
+                    contacts: contacts,
+                    loading: contactsLoading,
+                    businessId: business.id,
+                    locations: locations,
+                    onReload: loadContacts
+                )
+
+                // 5. Business properties
+                VStack(alignment: .leading, spacing: 8) {
+                    Label("Details", systemImage: "info.circle.fill")
+                        .font(.custom("Syne-Bold", size: 15))
+                        .foregroundColor(Color(hex: "0f1117"))
+
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
                         infoItem(label: "Est. Gallons/wk", value: "\(business.total_est_gallons ?? 0)")
                         infoItem(label: "Locations", value: "\(business.location_count ?? 0)")
                         infoItem(label: "Added By", value: business.created_by_name ?? "—")
                         infoItem(label: "Since", value: formatDate(business.created_at))
                         infoItem(label: "Next Call", value: nextCallDate() ?? "—")
+                        infoItem(label: "Pickup Freq", value: business.first_pickup_freq ?? "—")
                     }
 
-                    // Coordinates
                     if business.first_lat != nil || business.first_lng != nil {
                         Divider()
                         HStack(spacing: 16) {
@@ -461,169 +595,23 @@ struct BusinessDetailView: View {
                         }
                     }
                 }
-                .padding(20)
+                .padding(16)
                 .background(Color.white)
-                .cornerRadius(16)
-                .shadow(color: Color.black.opacity(0.06), radius: 8, y: 2)
+                .cornerRadius(14)
+                .shadow(color: Color.black.opacity(0.04), radius: 6, y: 2)
 
-                // Region card
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Region")
-                        .font(.custom("Syne-Bold", size: 16))
-                        .foregroundColor(Color(hex: "0f1117"))
-
-                    if canManageRegions {
-                        HStack(spacing: 12) {
-                            Image(systemName: "map.circle.fill")
-                                .font(.system(size: 16))
-                                .foregroundColor(Color(hex: "c8893a"))
-
-                            Picker("Region", selection: $selectedRegionId) {
-                                Text("No region assigned").tag(nil as Int?)
-                                ForEach(regions) { t in
-                                    Text(t.name).tag(t.id as Int?)
-                                }
-                            }
-                            .pickerStyle(.menu)
-                            .tint(Color(hex: "0f1117"))
-                            .font(.custom("DMSans-Regular", size: 14))
-
-                            Spacer()
-
-                            if selectedRegionId != business.region_id {
-                                Button(action: saveRegion) {
-                                    if saving {
-                                        ProgressView()
-                                            .scaleEffect(0.8)
-                                            .tint(Color.white)
-                                    } else {
-                                        Text("Save")
-                                            .font(.custom("DMSans-SemiBold", size: 13))
-                                    }
-                                }
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 6)
-                                .background(Color(hex: "2d6a4f"))
-                                .cornerRadius(8)
-                                .disabled(saving)
-                            }
-                        }
-
-                        if !errorMsg.isEmpty {
-                            Text(errorMsg)
-                                .font(.custom("DMSans-Regular", size: 12))
-                                .foregroundColor(Color(hex: "c1121f"))
-                        }
-                    } else {
-                        HStack(spacing: 8) {
-                            Image(systemName: "map.circle.fill")
-                                .font(.system(size: 16))
-                                .foregroundColor(Color(hex: "c8893a"))
-                            Text(business.region_name ?? "Unassigned")
-                                .font(.custom("DMSans-Medium", size: 14))
-                                .foregroundColor(Color(hex: "0f1117"))
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(20)
-                .background(Color.white)
-                .cornerRadius(16)
-                .shadow(color: Color.black.opacity(0.06), radius: 8, y: 2)
-
-                // Locations section
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack {
-                        Text("Locations")
-                            .font(.custom("Syne-Bold", size: 16))
-                            .foregroundColor(Color(hex: "0f1117"))
-                        Spacer()
-                        Text("\(locations.count)")
-                            .font(.custom("DMSans-SemiBold", size: 12))
-                            .foregroundColor(Color(hex: "2d6a4f"))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 2)
-                            .background(Color(hex: "d8f3dc"))
-                            .cornerRadius(50)
-
-                        Button(action: { showAddLocation = true }) {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.system(size: 20))
-                                .foregroundColor(Color(hex: "c8893a"))
-                        }
-                    }
-
-                    if locationsLoading {
-                        HStack {
-                            Spacer()
-                            ProgressView()
-                                .padding(.vertical, 20)
-                            Spacer()
-                        }
-                    } else if locations.isEmpty {
-                        Text("No locations added yet.")
-                            .font(.custom("DMSans-Regular", size: 13))
-                            .foregroundColor(Color(hex: "7a7f94"))
-                            .padding(.vertical, 8)
-                    } else {
-                        VStack(spacing: 0) {
-                            ForEach(locations) { loc in
-                                NavigationLink(destination: LocationDetailView(location: loc, businessName: business.name, onUpdate: reloadLocations)) {
-                                    LocationRow(location: loc)
-                                }
-                                if loc.id != locations.last?.id {
-                                    Divider().padding(.leading, 36)
-                                }
-                            }
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(20)
-                .background(Color.white)
-                .cornerRadius(16)
-                .shadow(color: Color.black.opacity(0.06), radius: 8, y: 2)
-                .sheet(isPresented: $showAddLocation) {
-                    AddLocationSheet(businessId: business.id, onSave: reloadLocations)
-                }
-
-                // Contacts section
-                ContactsSection(
-                    contacts: contacts,
-                    loading: contactsLoading,
-                    businessId: business.id,
-                    locations: locations,
-                    onReload: loadContactsAndEvents
-                )
-
-                // Contact Events section
-                EventsSection(
-                    events: events,
-                    loading: eventsLoading,
-                    businessId: business.id,
-                    contacts: contacts,
-                    locations: locations,
-                    onReload: loadContactsAndEvents
-                )
-
-                // Collections section
-                CollectionsSection(
-                    collections: collections,
-                    loading: collectionsLoading,
-                    locations: locations,
-                    onReload: loadCollectionsAndDocs
-                )
-
-                // Documents section
+                // 6. Documents
                 DocumentsSection(
                     documents: documents,
                     loading: documentsLoading,
                     businessId: business.id,
                     onReload: loadCollectionsAndDocs
                 )
+
+                // 7. Collection Reports
+                CollectionReportsSection(businessId: business.id)
             }
-            .padding(16)
+            .padding(12)
         }
         .background(Color(hex: "f5f4f0"))
         .navigationTitle(business.name)
@@ -643,9 +631,6 @@ struct BusinessDetailView: View {
                     }
                 }
             }
-        }
-        .onAppear {
-            selectedRegionId = business.region_id
         }
         .sheet(isPresented: $showEditSheet) {
             EditBusinessSheet(
@@ -675,32 +660,13 @@ struct BusinessDetailView: View {
                 locations = try await APIClient.shared.getLocations(bizId: business.id)
             } catch { }
             locationsLoading = false
-            await loadContactsAndEventsAsync()
+            await loadContactsAsync()
+            await loadNotesAsync()
             await loadCollectionsAndDocsAsync()
         }
     }
 
     // MARK: - Actions
-
-    private func saveRegion() {
-        saving = true
-        errorMsg = ""
-        Task {
-            do {
-                _ = try await APIClient.shared.updateBusiness(
-                    id: business.id,
-                    name: business.name,
-                    status: business.status,
-                    notes: business.notes,
-                    regionId: selectedRegionId
-                )
-                onUpdate()
-            } catch {
-                errorMsg = error.localizedDescription
-            }
-            saving = false
-        }
-    }
 
     private func toggleStatus() {
         let newStatus = business.status == "active" ? "inactive" : "active"
@@ -720,15 +686,22 @@ struct BusinessDetailView: View {
         }
     }
 
-    private func loadContactsAndEventsAsync() async {
+    private func loadContactsAsync() async {
         do { contacts = try await APIClient.shared.getContacts(bizId: business.id) } catch { }
         contactsLoading = false
-        do { events = try await APIClient.shared.getEvents(bizId: business.id) } catch { }
-        eventsLoading = false
     }
 
-    private func loadContactsAndEvents() {
-        Task { await loadContactsAndEventsAsync() }
+    private func loadContacts() {
+        Task { await loadContactsAsync() }
+    }
+
+    private func loadNotesAsync() async {
+        do { notes = try await APIClient.shared.getBusinessNotes(bizId: business.id) } catch { }
+        notesLoading = false
+    }
+
+    private func loadNotes() {
+        Task { await loadNotesAsync() }
     }
 
     private func loadCollectionsAndDocsAsync() async {
@@ -867,7 +840,17 @@ struct AddBusinessSheet: View {
                             }
                         }
 
-                        formField(label: "Notes", text: $notes, placeholder: "Any relevant notes…")
+                        VStack(alignment: .leading, spacing: 4) {
+                            fieldLabel("Notes")
+                            TextEditor(text: $notes)
+                                .font(.custom("DMSans-Regular", size: 14))
+                                .frame(minHeight: 80)
+                                .padding(8)
+                                .scrollContentBackground(.hidden)
+                                .background(Color.white)
+                                .cornerRadius(8)
+                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: "e2dfd6"), lineWidth: 1))
+                        }
                     }
 
                     Divider()
@@ -896,7 +879,11 @@ struct AddBusinessSheet: View {
                                     .frame(width: 80)
                             }
 
-                            formField(label: "Phone", text: $phone, placeholder: "540-555-1234", keyboard: .phonePad)
+                            formField(label: "Phone", text: $phone, placeholder: "(540) 555-1234", keyboard: .phonePad)
+                                .onChange(of: phone) { _, new in
+                                    let formatted = PhoneFormatter.autoFormat(new)
+                                    if formatted != new { phone = formatted }
+                                }
 
                             HStack(spacing: 10) {
                                 VStack(alignment: .leading, spacing: 4) {
@@ -1100,7 +1087,11 @@ struct AddLocationSheet: View {
                             .frame(width: 80)
                     }
 
-                    formField(label: "Phone", text: $phone, placeholder: "540-555-1234", keyboard: .phonePad)
+                    formField(label: "Phone", text: $phone, placeholder: "(540) 555-1234", keyboard: .phonePad)
+                        .onChange(of: phone) { _, new in
+                            let formatted = PhoneFormatter.autoFormat(new)
+                            if formatted != new { phone = formatted }
+                        }
 
                     HStack(spacing: 10) {
                         VStack(alignment: .leading, spacing: 4) {

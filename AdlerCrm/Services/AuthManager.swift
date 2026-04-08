@@ -1,4 +1,4 @@
-// AdlerCRM/Services/AuthManager.swift  28/03/2026 02:01:42
+// AdlerCRM/Services/AuthManager.swift  03/04/2026 02:16:32
 import Foundation
 import SwiftUI
 import Combine
@@ -33,11 +33,28 @@ final class AuthManager: ObservableObject {
         var tempToken: String?
         var userName: String?
         var error: String?
+        // Lockout
+        var locked = false
+        var lockedUntil: Date?
+        var retryAfterMinutes: Int?
+        var consecutiveFailures: Int?
     }
 
     func login(username: String, password: String) async -> LoginResult {
         do {
             let response = try await api.login(username: username, password: password)
+
+            // Check for lockout
+            if response.locked == true {
+                var result = LoginResult(error: response.error ?? "Account is locked")
+                result.locked = true
+                result.retryAfterMinutes = response.retry_after_minutes
+                result.consecutiveFailures = response.consecutive_failures
+                if let lu = response.locked_until {
+                    result.lockedUntil = ISO8601DateFormatter().date(from: lu)
+                }
+                return result
+            }
 
             if response.totp_required == true {
                 return LoginResult(
@@ -56,7 +73,9 @@ final class AuthManager: ObservableObject {
 
             return LoginResult(error: response.error ?? "Login failed")
         } catch {
-            return LoginResult(error: error.localizedDescription)
+            // Handle 429 (locked) and 401 responses that come as errors
+            let errMsg = error.localizedDescription
+            return LoginResult(error: errMsg)
         }
     }
 

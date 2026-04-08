@@ -1,4 +1,4 @@
-// AdlerCRM/Views/LocationViews.swift  28/03/2026 01:14:46
+// AdlerCRM/Views/LocationViews.swift  07/04/2026 20:18:54
 import SwiftUI
 import MapKit
 import Combine
@@ -41,7 +41,7 @@ struct LocationRow: View {
                         .font(.custom("DMSans-Regular", size: 11))
                         .foregroundColor(Color(hex: "7a7f94"))
                     if let ph = location.phone, !ph.isEmpty {
-                        Label(ph, systemImage: "phone")
+                        Label(PhoneFormatter.format(ph), systemImage: "phone")
                             .font(.custom("DMSans-Regular", size: 11))
                             .foregroundColor(Color(hex: "7a7f94"))
                             .lineLimit(1)
@@ -180,7 +180,11 @@ struct LocationDetailView: View {
                             editField(label: "ZIP", text: $editZip, placeholder: "24065")
                                 .frame(width: 80)
                         }
-                        editField(label: "Phone", text: $editPhone, placeholder: "540-232-9705", keyboard: .phonePad)
+                        editField(label: "Phone", text: $editPhone, placeholder: "(540) 555-1234", keyboard: .phonePad)
+                            .onChange(of: editPhone) { _, new in
+                                let formatted = PhoneFormatter.autoFormat(new)
+                                if formatted != new { editPhone = formatted }
+                            }
                     } else {
                         HStack(alignment: .top, spacing: 12) {
                             Image(systemName: "mappin.and.ellipse")
@@ -216,7 +220,7 @@ struct LocationDetailView: View {
                                     .font(.system(size: 14))
                                     .foregroundColor(Color(hex: "1d4e89"))
                                     .frame(width: 24)
-                                Text(ph)
+                                Text(PhoneFormatter.format(ph))
                                     .font(.custom("DMSans-Medium", size: 14))
                                     .foregroundColor(Color(hex: "0f1117"))
                             }
@@ -504,7 +508,7 @@ struct LocationDetailView: View {
         editCity = location.city ?? ""
         editState = location.state ?? ""
         editZip = location.zip ?? ""
-        editPhone = location.phone ?? ""
+        editPhone = PhoneFormatter.format(location.phone)
         editGallons = "\(location.estimated_gallons ?? 0)"
         editFreq = location.pickup_freq ?? "weekly"
         editLatitude = location.latitude != nil ? String(format: "%.6f", location.latitude!) : ""
@@ -564,12 +568,7 @@ struct LocationDetailView: View {
 
     private func openInMaps() {
         guard let coord = coordinate else { return }
-        let placemark = MKPlacemark(coordinate: coord)
-        let mapItem = MKMapItem(placemark: placemark)
-        mapItem.name = businessName
-        mapItem.openInMaps(launchOptions: [
-            MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDriving
-        ])
+        MapHelpers.openDirections(to: coord, name: businessName)
     }
 
     private func copyCoordinates() {

@@ -1,10 +1,4 @@
-//
-//  LoginView.swift
-//  AdlerCrm
-//
-//  Created by E. K. Khanine on 3/25/26.
-//
-// AdlerCRM/Views/LoginView.swift
+// AdlerCRM/Views/LoginView.swift  03/04/2026 02:16:32
 import SwiftUI
 
 struct LoginView: View {
@@ -393,7 +387,16 @@ struct LoginView: View {
                     step = .totpVerify
                 }
             } else {
-                error = result.error ?? "Invalid username or password."
+                if result.locked, let mins = result.retryAfterMinutes {
+                    if mins >= 60 {
+                        let hours = mins / 60
+                        error = "Account locked for \(hours) hour\(hours == 1 ? "" : "s") after \(result.consecutiveFailures ?? 0) failed attempts. Try again later."
+                    } else {
+                        error = "Account locked for \(mins) minute\(mins == 1 ? "" : "s") after \(result.consecutiveFailures ?? 0) failed attempts. Try again later."
+                    }
+                } else {
+                    error = result.error ?? "Invalid username or password."
+                }
             }
         }
     }

@@ -1,4 +1,4 @@
-// AdlerCRM/Views/CollectionMapView.swift
+// /AdlerCRM/Views/CollectionMapView.swift  08/04/2026 00:51:00 EDT
 import SwiftUI
 import MapKit
 import Combine
@@ -107,9 +107,6 @@ struct CollectionMapView: View {
                 items.append(RegionLegendItem(name: b.region_name ?? "Region \(tid)", color: color))
                 seen.insert(tid)
             }
-        }
-        if businesses.contains(where: { $0.region_id == nil }) {
-            items.append(RegionLegendItem(name: "Unassigned", color: unassignedColor))
         }
         return items
     }
@@ -418,12 +415,7 @@ struct LocationDetailSheet: View {
     }
 
     private func openInMaps() {
-        let placemark = MKPlacemark(coordinate: location.coordinate)
-        let mapItem = MKMapItem(placemark: placemark)
-        mapItem.name = location.businessName
-        mapItem.openInMaps(launchOptions: [
-            MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDriving
-        ])
+        MapHelpers.openDirections(to: location.coordinate, name: location.businessName)
     }
 
     private func infoItem(icon: String, label: String, value: String, color: Color) -> some View {
