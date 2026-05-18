@@ -1,4 +1,4 @@
-// AdlerCRM/Models/Models.swift  03/04/2026 02:16:32
+// /AdlerCRM/Models/Models.swift  17/05/2026 23:22:00 EDT
 import Foundation
 
 // MARK: - Flexible Decoding Helpers
@@ -29,11 +29,6 @@ struct LoginResponse: Codable {
     let token: String?
     let user: UserInfo?
     let error: String?
-    // Lockout fields
-    let locked: Bool?
-    let locked_until: String?
-    let retry_after_minutes: Int?
-    let consecutive_failures: Int?
 }
 
 struct TOTPSetupResponse: Codable {
@@ -46,6 +41,7 @@ struct TOTPVerifyResponse: Codable {
     let token: String
     let user: UserInfo
     let password_expired: Bool?
+    let hmac_key: String?
 }
 
 struct UserInfo: Codable, Identifiable {
@@ -387,29 +383,51 @@ struct SavedRouteStop: Codable {
 struct SavedRoute: Codable, Identifiable {
     let id: Int
     let name: String
-    let user_id: Int
     let start_name: String?
     let start_lat: Double?
     let start_lng: Double?
     let stops: [SavedRouteStop]?
-    let user_name: String?
-    let username: String?
-    let is_deleted: Bool?
+    let created_by: Int?
+    let created_by_name: String?
     let created_at: String?
+    let updated_at: String?
+    let is_deleted: Bool?
+    // Assignment context (from /routes/assigned/list)
+    let route_date: String?
+    let assigned_at: String?
+    let assigned_by: Int?
+    let assigned_by_name: String?
+    // Saved context (from /routes/saved/list)
+    let saved_at: String?
+    // Recurrence
+    let recurrence_start: String?
+    let recurrence_interval: Int?
+    let recurrence_unit: String?
+    // Source: "assigned" or "recurring" (from assigned/list)
+    let source: String?
 
     // Decode stops from JSONB string or array
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(Int.self, forKey: .id)
         name = try c.decode(String.self, forKey: .name)
-        user_id = try c.decode(Int.self, forKey: .user_id)
         start_name = try? c.decode(String.self, forKey: .start_name)
         start_lat = try? c.decode(Double.self, forKey: .start_lat)
         start_lng = try? c.decode(Double.self, forKey: .start_lng)
-        user_name = try? c.decode(String.self, forKey: .user_name)
-        username = try? c.decode(String.self, forKey: .username)
-        is_deleted = try? c.decode(Bool.self, forKey: .is_deleted)
+        created_by = try? c.decode(Int.self, forKey: .created_by)
+        created_by_name = try? c.decode(String.self, forKey: .created_by_name)
         created_at = try? c.decode(String.self, forKey: .created_at)
+        updated_at = try? c.decode(String.self, forKey: .updated_at)
+        is_deleted = try? c.decode(Bool.self, forKey: .is_deleted)
+        route_date = try? c.decode(String.self, forKey: .route_date)
+        assigned_at = try? c.decode(String.self, forKey: .assigned_at)
+        assigned_by = try? c.decode(Int.self, forKey: .assigned_by)
+        assigned_by_name = try? c.decode(String.self, forKey: .assigned_by_name)
+        saved_at = try? c.decode(String.self, forKey: .saved_at)
+        recurrence_start = try? c.decode(String.self, forKey: .recurrence_start)
+        recurrence_interval = try? c.decode(Int.self, forKey: .recurrence_interval)
+        recurrence_unit = try? c.decode(String.self, forKey: .recurrence_unit)
+        source = try? c.decode(String.self, forKey: .source)
 
         // stops can come as a JSON array or a JSON string
         if let arr = try? c.decode([SavedRouteStop].self, forKey: .stops) {
@@ -422,6 +440,24 @@ struct SavedRoute: Codable, Identifiable {
             stops = nil
         }
     }
+}
+
+// MARK: - Assigned Route Date Count
+
+struct AssignedDateCount: Codable {
+    let route_date: String
+    let route_count: Int
+}
+
+// MARK: - Route Assignment Response
+
+struct RouteAssignment: Codable {
+    let employee_id: Int
+    let route_id: Int
+    let route_date: String
+    let assigned_by: Int?
+    let assigned_at: String?
+    let is_deleted: Bool?
 }
 
 // MARK: - Report Models
@@ -569,6 +605,10 @@ struct TodoItem: Codable, Identifiable {
     let is_done: Bool?
     let user_id: Int?
     let user_name: String?
+    let assigned_to: Int?
+    let assigned_to_name: String?
+    let assigned_by: Int?
+    let assigned_by_name: String?
     let is_deleted: Bool?
     let created_at: String?
 
@@ -583,6 +623,10 @@ struct TodoItem: Codable, Identifiable {
         is_done = try? c.decode(Bool.self, forKey: .is_done)
         user_id = try c.flexibleInt(forKey: .user_id)
         user_name = try? c.decode(String.self, forKey: .user_name)
+        assigned_to = try? c.decode(Int.self, forKey: .assigned_to)
+        assigned_to_name = try? c.decode(String.self, forKey: .assigned_to_name)
+        assigned_by = try? c.decode(Int.self, forKey: .assigned_by)
+        assigned_by_name = try? c.decode(String.self, forKey: .assigned_by_name)
         is_deleted = try? c.decode(Bool.self, forKey: .is_deleted)
         created_at = try? c.decode(String.self, forKey: .created_at)
     }
@@ -677,5 +721,350 @@ struct CorporateNote: Codable, Identifiable {
         created_by_name = try? c.decode(String.self, forKey: .created_by_name)
         is_deleted = try? c.decode(Bool.self, forKey: .is_deleted)
         created_at = try? c.decode(String.self, forKey: .created_at)
+    }
+}
+
+// MARK: - Audit Log Models
+
+struct AuditLogEntry: Codable, Identifiable {
+    let id: Int
+    let timestamp: String?
+    let user_id: Int?
+    let username: String?
+    let method: String?
+    let path: String?
+    let status_code: Int?
+    let body: AuditLogBody?
+    let ip_address: String?
+    let user_agent: String?
+    let duration_ms: Int?
+    let action: String?
+    let entity_type: String?
+    let entity_id: Int?
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(Int.self, forKey: .id)
+        timestamp = try? c.decode(String.self, forKey: .timestamp)
+        user_id = try c.flexibleInt(forKey: .user_id)
+        username = try? c.decode(String.self, forKey: .username)
+        method = try? c.decode(String.self, forKey: .method)
+        path = try? c.decode(String.self, forKey: .path)
+        status_code = try? c.decode(Int.self, forKey: .status_code)
+        body = try? c.decode(AuditLogBody.self, forKey: .body)
+        ip_address = try? c.decode(String.self, forKey: .ip_address)
+        user_agent = try? c.decode(String.self, forKey: .user_agent)
+        duration_ms = try? c.decode(Int.self, forKey: .duration_ms)
+        action = try? c.decode(String.self, forKey: .action)
+        entity_type = try? c.decode(String.self, forKey: .entity_type)
+        entity_id = try c.flexibleInt(forKey: .entity_id)
+    }
+}
+
+// The body field is JSONB — it can be any shape, so we decode it as a dictionary
+struct AuditLogBody: Codable {
+    let raw: [String: AnyCodable]
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let dict = try? container.decode([String: AnyCodable].self) {
+            raw = dict
+        } else {
+            raw = [:]
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(raw)
+    }
+
+    var displayPairs: [(key: String, value: String)] {
+        raw.compactMap { (key, val) in
+            let str: String
+            switch val.value {
+            case let s as String: str = s
+            case let n as Int: str = "\(n)"
+            case let n as Double: str = "\(n)"
+            case let b as Bool: str = b ? "true" : "false"
+            default: str = "\(val.value)"
+            }
+            return (key: key, value: str)
+        }.sorted { $0.key < $1.key }
+    }
+}
+
+// Generic type-erased Codable wrapper for JSONB dictionaries
+struct AnyCodable: Codable {
+    let value: Any
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let v = try? container.decode(Bool.self) { value = v }
+        else if let v = try? container.decode(Int.self) { value = v }
+        else if let v = try? container.decode(Double.self) { value = v }
+        else if let v = try? container.decode(String.self) { value = v }
+        else if let v = try? container.decode([String: AnyCodable].self) { value = v }
+        else if let v = try? container.decode([AnyCodable].self) { value = v }
+        else if container.decodeNil() { value = "null" }
+        else { value = "?" }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch value {
+        case let v as Bool: try container.encode(v)
+        case let v as Int: try container.encode(v)
+        case let v as Double: try container.encode(v)
+        case let v as String: try container.encode(v)
+        case let v as [String: AnyCodable]: try container.encode(v)
+        case let v as [AnyCodable]: try container.encode(v)
+        default: try container.encodeNil()
+        }
+    }
+}
+
+struct AuditLogResponse: Codable {
+    let logs: [AuditLogEntry]
+    let total: Int
+}
+
+struct AuditLogStatsResponse: Decodable {
+    let last_24h: AuditLogStats24h
+    let total_records: Int
+}
+
+struct AuditLogStats24h: Decodable {
+    let actions: [AuditLogStatCount]
+    let entities: [AuditLogStatCount]
+    let users: [AuditLogStatUserCount]
+}
+
+struct AuditLogStatCount: Decodable, Identifiable {
+    var id: String { label }
+    let label: String
+    let count: Int
+
+    enum CodingKeys: String, CodingKey {
+        case action, entity_type, count
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        count = try c.decode(Int.self, forKey: .count)
+        if let a = try? c.decode(String.self, forKey: .action) { label = a }
+        else if let e = try? c.decode(String.self, forKey: .entity_type) { label = e }
+        else { label = "unknown" }
+    }
+}
+
+struct AuditLogStatUserCount: Codable, Identifiable {
+    var id: String { username }
+    let username: String
+    let count: Int
+}
+
+// MARK: - Route Travel Models
+
+struct TravelSession: Codable, Identifiable {
+    let id: Int
+    let user_id: Int
+    let route_id: Int?
+    let route_name: String
+    let status: String
+    let started_at: String?
+    let paused_at: String?
+    let ended_at: String?
+    let total_miles: Double?
+    let total_stops: Int
+    let stops_visited: Int
+    let user_name: String?
+    let events: [TravelEvent]?
+    let created_at: String?
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(Int.self, forKey: .id)
+        user_id = try c.decode(Int.self, forKey: .user_id)
+        route_id = try c.flexibleInt(forKey: .route_id)
+        route_name = try c.decode(String.self, forKey: .route_name)
+        status = try c.decode(String.self, forKey: .status)
+        started_at = try? c.decode(String.self, forKey: .started_at)
+        paused_at = try? c.decode(String.self, forKey: .paused_at)
+        ended_at = try? c.decode(String.self, forKey: .ended_at)
+        total_miles = try c.flexibleDouble(forKey: .total_miles)
+        total_stops = (try c.flexibleInt(forKey: .total_stops)) ?? 0
+        stops_visited = (try c.flexibleInt(forKey: .stops_visited)) ?? 0
+        user_name = try? c.decode(String.self, forKey: .user_name)
+        events = try? c.decode([TravelEvent].self, forKey: .events)
+        created_at = try? c.decode(String.self, forKey: .created_at)
+    }
+}
+
+struct TravelEvent: Codable, Identifiable {
+    let id: Int
+    let session_id: Int
+    let action: String
+    let latitude: Double?
+    let longitude: Double?
+    let stop_index: Int?
+    let stop_name: String?
+    let timestamp: String?
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(Int.self, forKey: .id)
+        session_id = try c.decode(Int.self, forKey: .session_id)
+        action = try c.decode(String.self, forKey: .action)
+        latitude = try c.flexibleDouble(forKey: .latitude)
+        longitude = try c.flexibleDouble(forKey: .longitude)
+        stop_index = try c.flexibleInt(forKey: .stop_index)
+        stop_name = try? c.decode(String.self, forKey: .stop_name)
+        timestamp = try? c.decode(String.self, forKey: .timestamp)
+    }
+}
+
+struct TravelHistoryResponse: Codable {
+    let sessions: [TravelSession]
+    let total: Int
+}
+
+struct TravelUserSummary: Decodable {
+    let user: TravelSummaryUser?
+    let stats: TravelSummaryStats
+    let recent_sessions: [TravelSession]
+    let stop_timings: [TravelStopTiming]
+}
+
+struct TravelSummaryUser: Codable {
+    let id: Int
+    let name: String
+    let username: String?
+    let role: String?
+}
+
+struct TravelSummaryStats: Decodable {
+    let total_sessions: Int
+    let total_seconds: Int
+    let avg_seconds: Int
+    let total_stops_visited: Int
+    let total_miles: Double
+
+    enum CodingKeys: String, CodingKey {
+        case total_sessions, total_seconds, avg_seconds, total_stops_visited, total_miles
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        total_sessions = try c.decode(Int.self, forKey: .total_sessions)
+        total_seconds = try c.decode(Int.self, forKey: .total_seconds)
+        avg_seconds = try c.decode(Int.self, forKey: .avg_seconds)
+        total_stops_visited = try c.decode(Int.self, forKey: .total_stops_visited)
+        total_miles = (try c.flexibleDouble(forKey: .total_miles)) ?? 0
+    }
+}
+
+struct TravelStopTiming: Codable, Identifiable {
+    var id: String { "\(session_id)-\(stop_index)" }
+    let session_id: Int
+    let stop_index: Int
+    let stop_name: String?
+    let minutes_from_previous: Int
+}
+
+// MARK: - Drum Models (NFC)
+
+struct Drum: Codable, Identifiable {
+    let id: Int
+    let nfc_tag_id: String
+    let nickname: String?
+    let location_id: Int?
+    let business_id: Int?
+    let latitude: Double?
+    let longitude: Double?
+    let capacity_gallons: Int?
+    let status: String?
+    let tag_type: String?
+    let registered_by: Int?
+    let last_scanned_at: String?
+    let last_scanned_by: Int?
+    let is_deleted: Bool?
+    let created_at: String?
+    let updated_at: String?
+    let business_name: String?
+    let location_address: String?
+    let location_city: String?
+    let registered_by_name: String?
+    let last_scanned_by_name: String?
+    let scan_count: Int?
+    let collection_count: Int?
+    let recent_scans: [DrumScan]?
+    let recent_collections: [DrumCollection]?
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(Int.self, forKey: .id)
+        nfc_tag_id = try c.decode(String.self, forKey: .nfc_tag_id)
+        nickname = try? c.decode(String.self, forKey: .nickname)
+        location_id = try c.flexibleInt(forKey: .location_id)
+        business_id = try c.flexibleInt(forKey: .business_id)
+        latitude = try c.flexibleDouble(forKey: .latitude)
+        longitude = try c.flexibleDouble(forKey: .longitude)
+        capacity_gallons = try c.flexibleInt(forKey: .capacity_gallons)
+        status = try? c.decode(String.self, forKey: .status)
+        tag_type = try? c.decode(String.self, forKey: .tag_type)
+        registered_by = try c.flexibleInt(forKey: .registered_by)
+        last_scanned_at = try? c.decode(String.self, forKey: .last_scanned_at)
+        last_scanned_by = try c.flexibleInt(forKey: .last_scanned_by)
+        is_deleted = try? c.decode(Bool.self, forKey: .is_deleted)
+        created_at = try? c.decode(String.self, forKey: .created_at)
+        updated_at = try? c.decode(String.self, forKey: .updated_at)
+        business_name = try? c.decode(String.self, forKey: .business_name)
+        location_address = try? c.decode(String.self, forKey: .location_address)
+        location_city = try? c.decode(String.self, forKey: .location_city)
+        registered_by_name = try? c.decode(String.self, forKey: .registered_by_name)
+        last_scanned_by_name = try? c.decode(String.self, forKey: .last_scanned_by_name)
+        scan_count = try c.flexibleInt(forKey: .scan_count)
+        collection_count = try c.flexibleInt(forKey: .collection_count)
+        recent_scans = try? c.decode([DrumScan].self, forKey: .recent_scans)
+        recent_collections = try? c.decode([DrumCollection].self, forKey: .recent_collections)
+    }
+}
+
+struct DrumScan: Codable, Identifiable {
+    let id: Int
+    let drum_id: Int
+    let user_id: Int?
+    let latitude: Double?
+    let longitude: Double?
+    let scanned_at: String?
+    let user_name: String?
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(Int.self, forKey: .id)
+        drum_id = try c.decode(Int.self, forKey: .drum_id)
+        user_id = try c.flexibleInt(forKey: .user_id)
+        latitude = try c.flexibleDouble(forKey: .latitude)
+        longitude = try c.flexibleDouble(forKey: .longitude)
+        scanned_at = try? c.decode(String.self, forKey: .scanned_at)
+        user_name = try? c.decode(String.self, forKey: .user_name)
+    }
+}
+
+struct DrumCollection: Codable, Identifiable {
+    let id: Int
+    let gallons: Double?
+    let pickup_date: String?
+    let notes: String?
+    let employee_name: String?
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(Int.self, forKey: .id)
+        gallons = try c.flexibleDouble(forKey: .gallons)
+        pickup_date = try? c.decode(String.self, forKey: .pickup_date)
+        notes = try? c.decode(String.self, forKey: .notes)
+        employee_name = try? c.decode(String.self, forKey: .employee_name)
     }
 }

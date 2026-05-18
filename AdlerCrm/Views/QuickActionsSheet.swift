@@ -1,4 +1,4 @@
-// /AdlerCRM/Views/QuickActionsSheet.swift  08/04/2026 01:05:00 EDT
+// /AdlerCRM/Views/QuickActionsSheet.swift  15/04/2026 01:32:00 EDT
 
 import SwiftUI
 
@@ -7,7 +7,7 @@ struct QuickAction: Identifiable {
     let icon: String
     let title: String
     let subtitle: String
-    let color: String
+    let color: Color
     let action: QuickActionType
 }
 
@@ -27,118 +27,174 @@ struct QuickActionsSheet: View {
     let onAction: (QuickActionType) -> Void
     @Environment(\.dismiss) var dismiss
 
-    private var isAdmin: Bool {
-        auth.currentUser?.role == "Administrator"
-    }
-
     private var actions: [QuickAction] {
-        var items: [QuickAction] = [
-            QuickAction(
-                icon: "map.fill",
-                title: "Full Map",
-                subtitle: "See all business locations",
-                color: "2d6a4f",
-                action: .switchTab("map")
-            ),
+        let items: [QuickAction] = [
             QuickAction(
                 icon: "building.2.fill",
                 title: "Businesses",
                 subtitle: "Browse and manage accounts",
-                color: "0f1117",
+                color: Color.theme.text,
                 action: .switchTab("businesses")
             ),
             QuickAction(
                 icon: "point.topleft.down.to.point.bottomright.curvepath.fill",
                 title: "Today's Route",
-                subtitle: "Calculate your pickup route",
-                color: "c8893a",
+                subtitle: "View your assigned route",
+                color: Color.theme.gold,
                 action: .switchTab("routes")
             ),
             QuickAction(
                 icon: "bell.fill",
                 title: "Send Notification",
                 subtitle: "Message a team member",
-                color: "c8893a",
+                color: Color.theme.gold,
                 action: .openSheet(.notifications)
             ),
             QuickAction(
                 icon: "checklist",
-                title: "Create a To-Do",
-                subtitle: "Add a task for today",
-                color: "2d6a4f",
+                title: "My To-Dos",
+                subtitle: "View and manage your tasks",
+                color: Color.theme.green,
                 action: .switchTab("todo")
             ),
             QuickAction(
-                icon: "pencil.and.list.clipboard",
-                title: "Custom Route",
-                subtitle: "Build a manual route",
-                color: "0f1117",
-                action: .switchTab("custom")
+                icon: "calendar",
+                title: "Calendar",
+                subtitle: "View scheduled routes by date",
+                color: Color.theme.text,
+                action: .switchTab("calendar")
+            ),
+            QuickAction(
+                icon: "map.fill",
+                title: "Full Map",
+                subtitle: "See all locations on the map",
+                color: Color.theme.green,
+                action: .switchTab("map")
             )
         ]
-
-        if isAdmin {
-            items.append(QuickAction(
-                icon: "testtube.2",
-                title: "Run Tests",
-                subtitle: "Execute API test suite",
-                color: "c1121f",
-                action: .openSheet(.tests)
-            ))
-            items.append(QuickAction(
-                icon: "person.2.fill",
-                title: "Employees",
-                subtitle: "Manage team members",
-                color: "7a7f94",
-                action: .openSheet(.employees)
-            ))
-        }
 
         return items
     }
 
+    @State private var showMore = false
+    @State private var showNotifications = false
+    @State private var appReady = false
+    @ObservedObject private var notifManager = NotificationManager.shared
+
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    // Greeting
-                    VStack(alignment: .leading, spacing: 4) {
+            ZStack {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
+                        // Greeting
                         Text(greeting)
                             .font(.custom("Syne-Bold", size: 26))
-                            .foregroundColor(Color(hex: "0f1117"))
-                        Text("What would you like to do?")
-                            .font(.custom("DMSans-Regular", size: 15))
-                            .foregroundColor(Color(hex: "7a7f94"))
-                    }
-                    .padding(.top, 8)
+                            .foregroundColor(Color.theme.text)
 
-                    // Action grid
-                    LazyVGrid(columns: [
-                        GridItem(.flexible(), spacing: 12),
-                        GridItem(.flexible(), spacing: 12)
-                    ], spacing: 12) {
-                        ForEach(actions) { action in
-                            Button {
-                                dismiss()
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                    onAction(action.action)
+                        // Action grid
+                        LazyVGrid(columns: [
+                            GridItem(.flexible(), spacing: 12),
+                            GridItem(.flexible(), spacing: 12)
+                        ], spacing: 12) {
+                            ForEach(actions) { action in
+                                Button {
+                                    dismiss()
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                        onAction(action.action)
+                                    }
+                                } label: {
+                                    actionCard(action)
                                 }
-                            } label: {
-                                actionCard(action)
+                                .buttonStyle(.plain)
+                                .disabled(!appReady)
                             }
-                            .buttonStyle(.plain)
+                        }
+                        .opacity(appReady ? 1 : 0.4)
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 20)
+                    .padding(.top, 4)
+                }
+                .background(Color.theme.background)
+
+                // Loading overlay
+                if !appReady {
+                    VStack(spacing: 16) {
+                        Spacer()
+                        Image("adler-logo")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 80, height: 80)
+                            .cornerRadius(16)
+                        ProgressView()
+                            .scaleEffect(1.1)
+                            .tint(Color(hex: "c8893a"))
+                        Text("Loading…")
+                            .font(.custom("DMSans-Medium", size: 14))
+                            .foregroundColor(Color.theme.textSecondary)
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color.theme.background.opacity(0.95))
+                    .transition(.opacity)
+                }
+            }
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    HStack(spacing: 14) {
+                        Button(action: { showMore = true }) {
+                            Image(systemName: "line.3.horizontal")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(Color.theme.text)
+                        }
+                        Button(action: { showNotifications = true }) {
+                            ZStack(alignment: .topTrailing) {
+                                Image(systemName: "bell.fill")
+                                    .font(.system(size: 15))
+                                    .foregroundColor(notifManager.unreadCount > 0 ? Color(hex: "c8893a") : Color.theme.textSecondary)
+                                if notifManager.unreadCount > 0 {
+                                    Text("\(min(notifManager.unreadCount, 99))")
+                                        .font(.system(size: 9, weight: .bold))
+                                        .foregroundColor(.white)
+                                        .frame(minWidth: 16, minHeight: 16)
+                                        .background(Color(hex: "c1121f"))
+                                        .cornerRadius(8)
+                                        .offset(x: 8, y: -6)
+                                }
+                            }
                         }
                     }
                 }
-                .padding(20)
-            }
-            .background(Color(hex: "f5f4f0"))
-            .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Skip") { dismiss() }
-                        .font(.custom("DMSans-Medium", size: 14))
-                        .foregroundColor(Color(hex: "7a7f94"))
+                    Button(action: { dismiss() }) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(Color.theme.textSecondary)
+                    }
                 }
+            }
+        }
+        .sheet(isPresented: $showMore) {
+            NavigationStack {
+                MoreMenuView()
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            Button("Done") { showMore = false }
+                                .font(.custom("DMSans-Medium", size: 14))
+                                .foregroundColor(Color(hex: "c8893a"))
+                        }
+                    }
+            }
+        }
+        .sheet(isPresented: $showNotifications) {
+            NotificationsSheet()
+        }
+        .task {
+            do {
+                _ = try await APIClient.shared.getBusinesses()
+            } catch { }
+            withAnimation(.easeOut(duration: 0.3)) {
+                appReady = true
             }
         }
     }
@@ -149,26 +205,26 @@ struct QuickActionsSheet: View {
         VStack(alignment: .leading, spacing: 10) {
             Image(systemName: action.icon)
                 .font(.system(size: 22))
-                .foregroundColor(Color(hex: action.color))
+                .foregroundColor(action.color)
 
             Text(action.title)
                 .font(.custom("DMSans-SemiBold", size: 14))
-                .foregroundColor(Color(hex: "0f1117"))
+                .foregroundColor(Color.theme.text)
                 .lineLimit(1)
 
             Text(action.subtitle)
                 .font(.custom("DMSans-Regular", size: 11))
-                .foregroundColor(Color(hex: "7a7f94"))
+                .foregroundColor(Color.theme.textSecondary)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
-        .background(Color.white)
+        .background(Color.theme.surface)
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(Color(hex: "e2dfd6"), lineWidth: 1)
+                .stroke(Color.theme.border, lineWidth: 1)
         )
     }
 

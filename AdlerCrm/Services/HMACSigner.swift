@@ -1,20 +1,34 @@
-// AdlerCRM/Services/HMACSigner.swift  07/04/2026 19:36:19
+// /AdlerCRM/Services/HMACSigner.swift  08/04/2026 05:30:00 EDT
 import Foundation
 import CryptoKit
 
 enum HMACSigner {
-    // Obfuscated shared secret — XOR encoded at build time
-    // To update: change plainSecret below, the xorKey, and recompute encoded bytes
-    private static let xorKey: UInt8 = 0xA7
-    private static let encodedSecret: [UInt8] = {
-        // Original: 609ecd45cd7ef4ebbce0cd37b4ffe66cbeef6cac03a2b49aa2c2677819b3b56c
-        let hex = "609ecd45cd7ef4ebbce0cd37b4ffe66cbeef6cac03a2b49aa2c2677819b3b56c"
-        return Array(hex.utf8)
-    }()
+    private static let keychainKey = "adler_hmac_secret"
 
-    private static var secret: SymmetricKey = {
-        let hexString = String(bytes: encodedSecret, encoding: .utf8)!
-        // Convert hex string to bytes
+    /// Store the HMAC secret in Keychain (called after TOTP verify)
+    static func storeSecret(_ hexString: String) {
+        KeychainHelper.save(key: keychainKey, value: hexString)
+    }
+
+    /// Clear the HMAC secret from Keychain (called on logout)
+    static func clearSecret() {
+        KeychainHelper.delete(key: keychainKey)
+    }
+
+    /// Check if an HMAC secret is available
+    static var hasSecret: Bool {
+        KeychainHelper.load(key: keychainKey) != nil
+    }
+
+    /// Sign a URLRequest in-place with HMAC headers.
+    /// If no secret is stored (pre-login), headers are not added.
+    static func sign(_ request: inout URLRequest) {
+        guard let hexString = KeychainHelper.load(key: keychainKey) else {
+            // No secret available (pre-login) — skip signing
+            return
+        }
+
+        // Convert hex string to raw bytes for SymmetricKey
         var bytes = [UInt8]()
         var idx = hexString.startIndex
         while idx < hexString.endIndex {
@@ -25,11 +39,8 @@ enum HMACSigner {
             }
             idx = nextIdx
         }
-        return SymmetricKey(data: bytes)
-    }()
+        let secret = SymmetricKey(data: bytes)
 
-    /// Sign a URLRequest in-place with HMAC headers
-    static func sign(_ request: inout URLRequest) {
         let timestamp = String(Int(Date().timeIntervalSince1970))
         let nonce = UUID().uuidString
 

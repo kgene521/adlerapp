@@ -1,4 +1,4 @@
-// /AdlerCRM/Views/CollectionMapView.swift  08/04/2026 00:51:00 EDT
+// /AdlerCRM/Views/CollectionMapView.swift  17/04/2026 02:27:00 EDT
 import SwiftUI
 import MapKit
 import Combine
@@ -135,7 +135,7 @@ struct CollectionMapView: View {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: loadData) {
                     Image(systemName: "arrow.clockwise")
-                        .foregroundColor(Color(hex: "7a7f94"))
+                        .foregroundColor(Color.theme.textSecondary)
                 }
             }
         }
@@ -155,7 +155,7 @@ struct CollectionMapView: View {
             HStack {
                 Text("\(mapLocations.count) of \(locations.count) locations mapped")
                     .font(.custom("DMSans-Regular", size: 12))
-                    .foregroundColor(Color(hex: "7a7f94"))
+                    .foregroundColor(Color.theme.textSecondary)
                 Spacer()
                 if missingCoordCount > 0 {
                     Label("\(missingCoordCount) missing coords", systemImage: "exclamationmark.triangle.fill")
@@ -165,7 +165,7 @@ struct CollectionMapView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
-            .background(Color(hex: "f5f4f0"))
+            .background(Color.theme.background)
 
             // Map
             Map(position: $cameraPosition) {
@@ -229,15 +229,15 @@ struct CollectionMapView: View {
                             )
                         Text(item.name)
                             .font(.custom("DMSans-Medium", size: 12))
-                            .foregroundColor(Color(hex: "3a3d4a"))
+                            .foregroundColor(Color.theme.text)
                     }
                 }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
         }
-        .background(Color.white)
-        .overlay(Rectangle().fill(Color(hex: "e2dfd6")).frame(height: 1), alignment: .top)
+        .background(Color.theme.surface)
+        .overlay(Rectangle().fill(Color.theme.border).frame(height: 1), alignment: .top)
     }
 
     // MARK: - Empty & Error
@@ -247,13 +247,13 @@ struct CollectionMapView: View {
             Spacer()
             Image(systemName: "map")
                 .font(.system(size: 40))
-                .foregroundColor(Color(hex: "7a7f94").opacity(0.4))
+                .foregroundColor(Color.theme.textSecondary.opacity(0.4))
             Text("No locations with coordinates")
                 .font(.custom("Syne-Bold", size: 17))
-                .foregroundColor(Color(hex: "3a3d4a"))
+                .foregroundColor(Color.theme.text)
             Text("Add latitude and longitude to your locations to see them on the map.")
                 .font(.custom("DMSans-Regular", size: 14))
-                .foregroundColor(Color(hex: "7a7f94"))
+                .foregroundColor(Color.theme.textSecondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
             Spacer()
@@ -268,14 +268,14 @@ struct CollectionMapView: View {
                 .foregroundColor(Color(hex: "c1121f"))
             Text(errorMsg)
                 .font(.custom("DMSans-Regular", size: 14))
-                .foregroundColor(Color(hex: "3a3d4a"))
+                .foregroundColor(Color.theme.text)
                 .multilineTextAlignment(.center)
             Button("Retry") { loadData() }
                 .font(.custom("DMSans-SemiBold", size: 14))
                 .foregroundColor(.white)
                 .padding(.horizontal, 24)
                 .padding(.vertical, 10)
-                .background(Color(hex: "0f1117"))
+                .background(Color.theme.text)
                 .cornerRadius(8)
             Spacer()
         }
@@ -310,6 +310,7 @@ struct LocationDetailSheet: View {
     let location: MapLocation
     @Binding var copiedFeedback: Bool
     @Environment(\.dismiss) var dismiss
+    @State private var showNavigation = false
 
     var body: some View {
         NavigationStack {
@@ -319,11 +320,11 @@ struct LocationDetailSheet: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(location.businessName)
                             .font(.custom("Syne-Bold", size: 22))
-                            .foregroundColor(Color(hex: "0f1117"))
+                            .foregroundColor(Color.theme.text)
 
                         Text(location.address)
                             .font(.custom("DMSans-Regular", size: 14))
-                            .foregroundColor(Color(hex: "7a7f94"))
+                            .foregroundColor(Color.theme.textSecondary)
                     }
 
                     Divider()
@@ -344,11 +345,11 @@ struct LocationDetailSheet: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("COORDINATES")
                                 .font(.custom("DMSans-SemiBold", size: 9))
-                                .foregroundColor(Color(hex: "7a7f94"))
+                                .foregroundColor(Color.theme.textSecondary)
                                 .tracking(0.5)
                             Text(coordString)
                                 .font(.system(.caption, design: .monospaced))
-                                .foregroundColor(Color(hex: "0f1117"))
+                                .foregroundColor(Color.theme.text)
                                 .textSelection(.enabled)
                         }
 
@@ -361,20 +362,20 @@ struct LocationDetailSheet: View {
                                 Text(copiedFeedback ? "Copied" : "Copy")
                                     .font(.custom("DMSans-SemiBold", size: 11))
                             }
-                            .foregroundColor(copiedFeedback ? Color(hex: "2d6a4f") : Color(hex: "3a3d4a"))
+                            .foregroundColor(copiedFeedback ? Color(hex: "2d6a4f") : Color.theme.text)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 6)
-                            .background(Color(hex: "f5f4f0"))
+                            .background(Color.theme.background)
                             .cornerRadius(6)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 6)
-                                    .stroke(Color(hex: "e2dfd6"), lineWidth: 1)
+                                    .stroke(Color.theme.border, lineWidth: 1)
                             )
                         }
                     }
 
                     // Navigate button
-                    Button(action: openInMaps) {
+                    Button(action: { showNavigation = true }) {
                         HStack {
                             Image(systemName: "map.fill")
                                 .font(.system(size: 14))
@@ -384,8 +385,11 @@ struct LocationDetailSheet: View {
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
-                        .background(Color(hex: "0f1117"))
+                        .background(Color.theme.text)
                         .cornerRadius(12)
+                    }
+                    .fullScreenCover(isPresented: $showNavigation) {
+                        InAppNavigationSheet(destination: location.coordinate, destinationName: location.businessName)
                     }
                 }
                 .padding(20)
@@ -414,10 +418,6 @@ struct LocationDetailSheet: View {
         }
     }
 
-    private func openInMaps() {
-        MapHelpers.openDirections(to: location.coordinate, name: location.businessName)
-    }
-
     private func infoItem(icon: String, label: String, value: String, color: Color) -> some View {
         VStack(spacing: 4) {
             Image(systemName: icon)
@@ -425,11 +425,11 @@ struct LocationDetailSheet: View {
                 .foregroundColor(color)
             Text(label.uppercased())
                 .font(.custom("DMSans-SemiBold", size: 8))
-                .foregroundColor(Color(hex: "7a7f94"))
+                .foregroundColor(Color.theme.textSecondary)
                 .tracking(0.4)
             Text(value)
                 .font(.custom("DMSans-Medium", size: 12))
-                .foregroundColor(Color(hex: "0f1117"))
+                .foregroundColor(Color.theme.text)
                 .lineLimit(1)
         }
     }

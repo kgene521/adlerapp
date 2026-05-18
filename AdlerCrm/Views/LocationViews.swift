@@ -1,4 +1,4 @@
-// AdlerCRM/Views/LocationViews.swift  07/04/2026 20:18:54
+// /AdlerCRM/Views/LocationViews.swift  17/04/2026 02:08:00 EDT
 import SwiftUI
 import MapKit
 import Combine
@@ -12,21 +12,21 @@ struct LocationRow: View {
         HStack(spacing: 12) {
             Image(systemName: "mappin.circle.fill")
                 .font(.system(size: 22))
-                .foregroundColor(isInactive ? Color(hex: "e2dfd6") : (location.latitude != nil ? Color(hex: "2d6a4f") : Color(hex: "e2dfd6")))
+                .foregroundColor(isInactive ? Color.theme.border : (location.latitude != nil ? Color(hex: "2d6a4f") : Color.theme.border))
 
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Text(addressLine)
                         .font(.custom("DMSans-SemiBold", size: 14))
-                        .foregroundColor(Color(hex: "0f1117"))
+                        .foregroundColor(Color.theme.text)
                         .lineLimit(1)
                     if isInactive {
                         Text("Inactive")
                             .font(.custom("DMSans-SemiBold", size: 9))
-                            .foregroundColor(Color(hex: "7a7f94"))
+                            .foregroundColor(Color.theme.textSecondary)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(Color(hex: "e2dfd6"))
+                            .background(Color.theme.border)
                             .cornerRadius(50)
                     }
                 }
@@ -39,11 +39,11 @@ struct LocationRow: View {
                     }
                     Label(freqLabel, systemImage: "clock")
                         .font(.custom("DMSans-Regular", size: 11))
-                        .foregroundColor(Color(hex: "7a7f94"))
+                        .foregroundColor(Color.theme.textSecondary)
                     if let ph = location.phone, !ph.isEmpty {
                         Label(PhoneFormatter.format(ph), systemImage: "phone")
                             .font(.custom("DMSans-Regular", size: 11))
-                            .foregroundColor(Color(hex: "7a7f94"))
+                            .foregroundColor(Color.theme.textSecondary)
                             .lineLimit(1)
                     }
                 }
@@ -59,7 +59,7 @@ struct LocationRow: View {
 
             Image(systemName: "chevron.right")
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(Color(hex: "e2dfd6"))
+                .foregroundColor(Color.theme.border)
         }
         .padding(.vertical, 8)
         .opacity(isInactive ? 0.5 : 1)
@@ -101,6 +101,7 @@ struct LocationDetailView: View {
     @State private var saveSuccess = false
     @State private var showDeactivateConfirm = false
     @State private var showReactivateConfirm = false
+    @State private var showNavigation = false
 
     private var isInactive: Bool { location.is_deleted == true }
 
@@ -150,7 +151,7 @@ struct LocationDetailView: View {
                             ))
                         }
 
-                        Button(action: openInMaps) {
+                        Button(action: { showNavigation = true }) {
                             HStack(spacing: 8) {
                                 Image(systemName: "arrow.triangle.turn.up.right.diamond.fill")
                                     .font(.system(size: 14))
@@ -160,9 +161,12 @@ struct LocationDetailView: View {
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 13)
-                            .background(Color(hex: "0f1117"))
+                            .background(Color.theme.text)
                         }
                         .cornerRadius(16, corners: [.bottomLeft, .bottomRight])
+                        .fullScreenCover(isPresented: $showNavigation) {
+                            InAppNavigationSheet(destination: coord, destinationName: businessName)
+                        }
                     }
                     .shadow(color: Color.black.opacity(0.06), radius: 8, y: 2)
                 }
@@ -196,19 +200,19 @@ struct LocationDetailView: View {
                                 if let addr = location.address, !addr.isEmpty {
                                     Text(addr)
                                         .font(.custom("DMSans-Medium", size: 15))
-                                        .foregroundColor(Color(hex: "0f1117"))
+                                        .foregroundColor(Color.theme.text)
                                 }
                                 let cityState = [location.city, location.state, location.zip]
                                     .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: ", ")
                                 if !cityState.isEmpty {
                                     Text(cityState)
                                         .font(.custom("DMSans-Regular", size: 14))
-                                        .foregroundColor(Color(hex: "7a7f94"))
+                                        .foregroundColor(Color.theme.textSecondary)
                                 }
                                 if (location.address ?? "").isEmpty && cityState.isEmpty {
                                     Text("No address provided")
                                         .font(.custom("DMSans-Regular", size: 14))
-                                        .foregroundColor(Color(hex: "7a7f94"))
+                                        .foregroundColor(Color.theme.textSecondary)
                                         .italic()
                                 }
                             }
@@ -222,7 +226,7 @@ struct LocationDetailView: View {
                                     .frame(width: 24)
                                 Text(PhoneFormatter.format(ph))
                                     .font(.custom("DMSans-Medium", size: 14))
-                                    .foregroundColor(Color(hex: "0f1117"))
+                                    .foregroundColor(Color.theme.text)
                             }
                         }
                     }
@@ -238,21 +242,21 @@ struct LocationDetailView: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("EST. CAPACITY (GAL/WK)")
                                     .font(.custom("DMSans-SemiBold", size: 9))
-                                    .foregroundColor(Color(hex: "7a7f94"))
+                                    .foregroundColor(Color.theme.textSecondary)
                                     .tracking(0.4)
                                 TextField("0", text: $editGallons)
                                     .keyboardType(.numberPad)
                                     .font(.custom("DMSans-Regular", size: 14))
                                     .padding(10)
-                                    .background(Color(hex: "f5f4f0"))
+                                    .background(Color.theme.background)
                                     .cornerRadius(8)
-                                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: "e2dfd6"), lineWidth: 1))
+                                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.theme.border, lineWidth: 1))
                             }
 
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("FREQUENCY")
                                     .font(.custom("DMSans-SemiBold", size: 9))
-                                    .foregroundColor(Color(hex: "7a7f94"))
+                                    .foregroundColor(Color.theme.textSecondary)
                                     .tracking(0.4)
                                 Picker("Frequency", selection: $editFreq) {
                                     Text("Weekly").tag("weekly")
@@ -260,13 +264,13 @@ struct LocationDetailView: View {
                                     Text("Monthly").tag("monthly")
                                 }
                                 .pickerStyle(.menu)
-                                .tint(Color(hex: "0f1117"))
+                                .tint(Color.theme.text)
                                 .font(.custom("DMSans-Regular", size: 14))
                                 .padding(.vertical, 4)
                                 .padding(.horizontal, 6)
-                                .background(Color(hex: "f5f4f0"))
+                                .background(Color.theme.background)
                                 .cornerRadius(8)
-                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: "e2dfd6"), lineWidth: 1))
+                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.theme.border, lineWidth: 1))
                             }
                         }
 
@@ -302,6 +306,7 @@ struct LocationDetailView: View {
                             editField(label: "Latitude", text: $editLatitude, placeholder: "e.g. 37.2710", keyboard: .numbersAndPunctuation)
                             editField(label: "Longitude", text: $editLongitude, placeholder: "e.g. -79.9414", keyboard: .numbersAndPunctuation)
                         }
+                        .coordinatePaste(latitude: $editLatitude, longitude: $editLongitude)
                     } else if hasCoordinates {
                         HStack {
                             VStack(alignment: .leading, spacing: 6) {
@@ -316,18 +321,18 @@ struct LocationDetailView: View {
                                     Text(copiedFeedback ? "Copied" : "Copy")
                                         .font(.custom("DMSans-SemiBold", size: 12))
                                 }
-                                .foregroundColor(copiedFeedback ? Color(hex: "2d6a4f") : Color(hex: "3a3d4a"))
+                                .foregroundColor(copiedFeedback ? Color(hex: "2d6a4f") : Color.theme.text)
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 8)
-                                .background(Color(hex: "f5f4f0"))
+                                .background(Color.theme.background)
                                 .cornerRadius(8)
-                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: "e2dfd6"), lineWidth: 1))
+                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.theme.border, lineWidth: 1))
                             }
                         }
                     } else {
                         Text("No coordinates set")
                             .font(.custom("DMSans-Regular", size: 13))
-                            .foregroundColor(Color(hex: "7a7f94"))
+                            .foregroundColor(Color.theme.textSecondary)
                             .italic()
                     }
                 }
@@ -351,13 +356,13 @@ struct LocationDetailView: View {
                         .foregroundColor(Color(hex: "c1121f"))
                         .padding(12)
                         .frame(maxWidth: .infinity)
-                        .background(Color(hex: "ffe5e7"))
+                        .background(Color.theme.red.opacity(0.08))
                         .cornerRadius(8)
                 }
             }
             .padding(16)
         }
-        .background(Color(hex: "f5f4f0"))
+        .background(Color.theme.background)
         .navigationTitle(addressShort)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -376,7 +381,7 @@ struct LocationDetailView: View {
                             populateEditFields()
                         }
                         .font(.custom("DMSans-Regular", size: 14))
-                        .foregroundColor(Color(hex: "7a7f94"))
+                        .foregroundColor(Color.theme.textSecondary)
 
                         Button(action: save) {
                             if saving {
@@ -437,15 +442,15 @@ struct LocationDetailView: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label.uppercased())
                 .font(.custom("DMSans-SemiBold", size: 9))
-                .foregroundColor(Color(hex: "7a7f94"))
+                .foregroundColor(Color.theme.textSecondary)
                 .tracking(0.4)
             TextField(placeholder, text: text)
                 .keyboardType(keyboard)
                 .font(.custom("DMSans-Regular", size: 14))
                 .padding(10)
-                .background(Color(hex: "f5f4f0"))
+                .background(Color.theme.background)
                 .cornerRadius(8)
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: "e2dfd6"), lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.theme.border, lineWidth: 1))
         }
     }
 
@@ -454,7 +459,7 @@ struct LocationDetailView: View {
     private func sectionHeader(_ title: String) -> some View {
         Text(title)
             .font(.custom("Syne-Bold", size: 16))
-            .foregroundColor(Color(hex: "0f1117"))
+            .foregroundColor(Color.theme.text)
     }
 
     private func statItem(icon: String, label: String, value: String, color: Color) -> some View {
@@ -466,11 +471,11 @@ struct LocationDetailView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(label.uppercased())
                     .font(.custom("DMSans-SemiBold", size: 8))
-                    .foregroundColor(Color(hex: "7a7f94"))
+                    .foregroundColor(Color.theme.textSecondary)
                     .tracking(0.4)
                 Text(value)
                     .font(.custom("DMSans-SemiBold", size: 14))
-                    .foregroundColor(Color(hex: "0f1117"))
+                    .foregroundColor(Color.theme.text)
             }
         }
     }
@@ -479,12 +484,12 @@ struct LocationDetailView: View {
         HStack(spacing: 8) {
             Text(label)
                 .font(.custom("DMSans-SemiBold", size: 9))
-                .foregroundColor(Color(hex: "7a7f94"))
+                .foregroundColor(Color.theme.textSecondary)
                 .tracking(0.5)
                 .frame(width: 28, alignment: .trailing)
             Text(value)
                 .font(.system(.subheadline, design: .monospaced))
-                .foregroundColor(Color(hex: "0f1117"))
+                .foregroundColor(Color.theme.text)
                 .textSelection(.enabled)
         }
     }
@@ -493,11 +498,11 @@ struct LocationDetailView: View {
         VStack(alignment: .leading, spacing: 3) {
             Text(label.uppercased())
                 .font(.custom("DMSans-SemiBold", size: 9))
-                .foregroundColor(Color(hex: "7a7f94"))
+                .foregroundColor(Color.theme.textSecondary)
                 .tracking(0.5)
             Text(value)
                 .font(.custom("DMSans-Medium", size: 14))
-                .foregroundColor(Color(hex: "0f1117"))
+                .foregroundColor(Color.theme.text)
         }
     }
 
@@ -566,11 +571,6 @@ struct LocationDetailView: View {
         }
     }
 
-    private func openInMaps() {
-        guard let coord = coordinate else { return }
-        MapHelpers.openDirections(to: coord, name: businessName)
-    }
-
     private func copyCoordinates() {
         guard let lat = location.latitude, let lng = location.longitude else { return }
         UIPasteboard.general.string = String(format: "%.6f, %.6f", lat, lng)
@@ -620,7 +620,7 @@ struct CardStyleModifier: ViewModifier {
         content
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(20)
-            .background(Color.white)
+            .background(Color.theme.surface)
             .cornerRadius(16)
             .shadow(color: Color.black.opacity(0.06), radius: 8, y: 2)
     }

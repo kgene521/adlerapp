@@ -1,4 +1,4 @@
-// AdlerCRM/Views/CollectionDocumentViews.swift  07/04/2026 20:28:49
+// /AdlerCRM/Views/CollectionDocumentViews.swift  17/05/2026 23:22:00 EDT
 import SwiftUI
 import PhotosUI
 import Combine
@@ -23,7 +23,7 @@ struct CollectionsSection: View {
             HStack {
                 Text("Oil Collections")
                     .font(.custom("Syne-Bold", size: 16))
-                    .foregroundColor(Color(hex: "0f1117"))
+                    .foregroundColor(Color.theme.text)
                 Spacer()
 
                 if !collections.isEmpty {
@@ -32,7 +32,7 @@ struct CollectionsSection: View {
                         .foregroundColor(Color(hex: "2d6a4f"))
                         .padding(.horizontal, 8)
                         .padding(.vertical, 2)
-                        .background(Color(hex: "d8f3dc"))
+                        .background(Color.theme.green.opacity(0.12))
                         .cornerRadius(50)
                 }
 
@@ -57,10 +57,10 @@ struct CollectionsSection: View {
                 VStack(spacing: 6) {
                     Image(systemName: "drop")
                         .font(.system(size: 28))
-                        .foregroundColor(Color(hex: "e2dfd6"))
+                        .foregroundColor(Color.theme.border)
                     Text("No collections yet")
                         .font(.custom("DMSans-Regular", size: 13))
-                        .foregroundColor(Color(hex: "7a7f94"))
+                        .foregroundColor(Color.theme.textSecondary)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
@@ -79,7 +79,7 @@ struct CollectionsSection: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(20)
-        .background(Color.white)
+        .background(Color.theme.surface)
         .cornerRadius(16)
         .shadow(color: Color.black.opacity(0.06), radius: 8, y: 2)
         .sheet(isPresented: $showLogSheet) {
@@ -117,24 +117,24 @@ struct CollectionRow: View {
                 HStack(spacing: 8) {
                     Text("\(Int(collection.gallons ?? 0)) gallons")
                         .font(.custom("DMSans-SemiBold", size: 14))
-                        .foregroundColor(Color(hex: "0f1117"))
+                        .foregroundColor(Color.theme.text)
 
                     Text(shortDate(collection.pickup_date))
                         .font(.custom("DMSans-Regular", size: 12))
-                        .foregroundColor(Color(hex: "7a7f94"))
+                        .foregroundColor(Color.theme.textSecondary)
                 }
 
                 HStack(spacing: 8) {
                     if let addr = collection.location_address, !addr.isEmpty {
                         Label(addr, systemImage: "mappin")
                             .font(.custom("DMSans-Regular", size: 11))
-                            .foregroundColor(Color(hex: "7a7f94"))
+                            .foregroundColor(Color.theme.textSecondary)
                             .lineLimit(1)
                     }
                     if let emp = collection.employee_name, !emp.isEmpty {
                         Label(emp, systemImage: "person")
                             .font(.custom("DMSans-Regular", size: 11))
-                            .foregroundColor(Color(hex: "7a7f94"))
+                            .foregroundColor(Color.theme.textSecondary)
                             .lineLimit(1)
                     }
                 }
@@ -142,7 +142,7 @@ struct CollectionRow: View {
                 if let notes = collection.notes, !notes.isEmpty {
                     Text(notes)
                         .font(.custom("DMSans-Italic", size: 11))
-                        .foregroundColor(Color(hex: "7a7f94"))
+                        .foregroundColor(Color.theme.textSecondary)
                         .lineLimit(2)
                 }
             }
@@ -195,6 +195,8 @@ struct LogCollectionSheet: View {
     @State private var notes = ""
     @State private var saving = false
     @State private var errorMsg = ""
+    @State private var scannedDrum: Drum?
+    @State private var scannedDrumId: Int?
 
     var body: some View {
         NavigationStack {
@@ -206,7 +208,7 @@ struct LogCollectionSheet: View {
                             .foregroundColor(Color(hex: "c1121f"))
                             .padding(12)
                             .frame(maxWidth: .infinity)
-                            .background(Color(hex: "ffe5e7"))
+                            .background(Color.theme.red.opacity(0.08))
                             .cornerRadius(8)
                     }
 
@@ -221,12 +223,12 @@ struct LogCollectionSheet: View {
                             }
                         }
                         .pickerStyle(.menu)
-                        .tint(Color(hex: "0f1117"))
+                        .tint(Color.theme.text)
                         .font(.custom("DMSans-Regular", size: 14))
                         .padding(8)
-                        .background(Color.white)
+                        .background(Color.theme.surface)
                         .cornerRadius(8)
-                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: "e2dfd6"), lineWidth: 1))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.theme.border, lineWidth: 1))
                     }
 
                     // Date
@@ -244,9 +246,9 @@ struct LogCollectionSheet: View {
                             .keyboardType(.decimalPad)
                             .font(.custom("DMSans-Regular", size: 14))
                             .padding(12)
-                            .background(Color.white)
+                            .background(Color.theme.surface)
                             .cornerRadius(8)
-                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: "e2dfd6"), lineWidth: 1))
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.theme.border, lineWidth: 1))
                     }
 
                     // Notes
@@ -256,21 +258,27 @@ struct LogCollectionSheet: View {
                             .font(.custom("DMSans-Regular", size: 14))
                             .frame(minHeight: 80)
                             .padding(8)
-                            .background(Color.white)
+                            .background(Color.theme.surface)
                             .cornerRadius(8)
-                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: "e2dfd6"), lineWidth: 1))
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.theme.border, lineWidth: 1))
+                    }
+
+                    // NFC Drum Scan
+                    VStack(alignment: .leading, spacing: 4) {
+                        fieldLabel("Drum (Optional)")
+                        DrumScanButton(scannedDrum: $scannedDrum, scannedDrumId: $scannedDrumId)
                     }
                 }
                 .padding(20)
             }
-            .background(Color(hex: "f5f4f0"))
+            .background(Color.theme.background)
             .navigationTitle("Log Oil Collection")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") { dismiss() }
                         .font(.custom("DMSans-Regular", size: 14))
-                        .foregroundColor(Color(hex: "7a7f94"))
+                        .foregroundColor(Color.theme.textSecondary)
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: save) {
@@ -290,7 +298,7 @@ struct LogCollectionSheet: View {
     private func fieldLabel(_ text: String) -> some View {
         Text(text.uppercased())
             .font(.custom("DMSans-SemiBold", size: 9))
-            .foregroundColor(Color(hex: "7a7f94"))
+            .foregroundColor(Color.theme.textSecondary)
             .tracking(0.4)
     }
 
@@ -310,7 +318,8 @@ struct LogCollectionSheet: View {
                     locationId: locId,
                     pickupDate: fmt.string(from: pickupDate),
                     gallons: gal,
-                    notes: notes.isEmpty ? nil : notes
+                    notes: notes.isEmpty ? nil : notes,
+                    drumId: scannedDrumId
                 )
                 onSave()
                 dismiss()
@@ -347,15 +356,15 @@ struct DocumentsSection: View {
             HStack {
                 Text("Documents & Reports")
                     .font(.custom("Syne-Bold", size: 16))
-                    .foregroundColor(Color(hex: "0f1117"))
+                    .foregroundColor(Color.theme.text)
                 Spacer()
                 if !documents.isEmpty {
                     Text("\(documents.count)")
                         .font(.custom("DMSans-SemiBold", size: 12))
-                        .foregroundColor(Color(hex: "7a7f94"))
+                        .foregroundColor(Color.theme.textSecondary)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 2)
-                        .background(Color(hex: "e2dfd6"))
+                        .background(Color.theme.border)
                         .cornerRadius(50)
                 }
 
@@ -369,7 +378,7 @@ struct DocumentsSection: View {
                     .foregroundColor(.white)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
-                    .background(Color(hex: "0f1117"))
+                    .background(Color.theme.text)
                     .cornerRadius(50)
                 }
             }
@@ -394,7 +403,7 @@ struct DocumentsSection: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(20)
-        .background(Color.white)
+        .background(Color.theme.surface)
         .cornerRadius(16)
         .shadow(color: Color.black.opacity(0.06), radius: 8, y: 2)
         .sheet(isPresented: $showUploadSheet) {
@@ -423,7 +432,7 @@ struct DocumentsSection: View {
                     .foregroundColor(Color(hex: "c8893a"))
                 Text("REPORTS")
                     .font(.custom("DMSans-SemiBold", size: 10))
-                    .foregroundColor(Color(hex: "7a7f94"))
+                    .foregroundColor(Color.theme.textSecondary)
                     .tracking(0.5)
             }
 
@@ -436,15 +445,15 @@ struct DocumentsSection: View {
                     VStack(alignment: .leading, spacing: 1) {
                         Text("Collection Summary")
                             .font(.custom("DMSans-SemiBold", size: 13))
-                            .foregroundColor(Color(hex: "0f1117"))
+                            .foregroundColor(Color.theme.text)
                         Text("Gallons collected over time")
                             .font(.custom("DMSans-Regular", size: 11))
-                            .foregroundColor(Color(hex: "7a7f94"))
+                            .foregroundColor(Color.theme.textSecondary)
                     }
                     Spacer()
                     Image(systemName: "chevron.right")
                         .font(.system(size: 10, weight: .semibold))
-                        .foregroundColor(Color(hex: "e2dfd6"))
+                        .foregroundColor(Color.theme.border)
                 }
                 .padding(.vertical, 4)
             }
@@ -461,15 +470,15 @@ struct DocumentsSection: View {
                     VStack(alignment: .leading, spacing: 1) {
                         Text("Pickup Log")
                             .font(.custom("DMSans-SemiBold", size: 13))
-                            .foregroundColor(Color(hex: "0f1117"))
+                            .foregroundColor(Color.theme.text)
                         Text("Detailed pickup history")
                             .font(.custom("DMSans-Regular", size: 11))
-                            .foregroundColor(Color(hex: "7a7f94"))
+                            .foregroundColor(Color.theme.textSecondary)
                     }
                     Spacer()
                     Image(systemName: "chevron.right")
                         .font(.system(size: 10, weight: .semibold))
-                        .foregroundColor(Color(hex: "e2dfd6"))
+                        .foregroundColor(Color.theme.border)
                 }
                 .padding(.vertical, 4)
             }
@@ -487,11 +496,11 @@ struct DocumentsSection: View {
                     .foregroundColor(color)
                 Text(title.uppercased())
                     .font(.custom("DMSans-SemiBold", size: 10))
-                    .foregroundColor(Color(hex: "7a7f94"))
+                    .foregroundColor(Color.theme.textSecondary)
                     .tracking(0.5)
                 Text("(\(docs.count))")
                     .font(.custom("DMSans-Regular", size: 10))
-                    .foregroundColor(Color(hex: "7a7f94"))
+                    .foregroundColor(Color.theme.textSecondary)
             }
 
             ForEach(docs) { doc in
@@ -528,24 +537,24 @@ struct DocumentRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(document.original_name ?? document.file_name ?? "Document")
                     .font(.custom("DMSans-Medium", size: 13))
-                    .foregroundColor(Color(hex: "0f1117"))
+                    .foregroundColor(Color.theme.text)
                     .lineLimit(1)
 
                 HStack(spacing: 8) {
                     if let name = document.uploaded_by_name {
                         Text(name)
                             .font(.custom("DMSans-Regular", size: 11))
-                            .foregroundColor(Color(hex: "7a7f94"))
+                            .foregroundColor(Color.theme.textSecondary)
                     }
                     Text(shortDate(document.created_at))
                         .font(.custom("DMSans-Regular", size: 11))
-                        .foregroundColor(Color(hex: "7a7f94"))
+                        .foregroundColor(Color.theme.textSecondary)
                 }
 
                 if let notes = document.notes, !notes.isEmpty {
                     Text(notes)
                         .font(.custom("DMSans-Italic", size: 11))
-                        .foregroundColor(Color(hex: "7a7f94"))
+                        .foregroundColor(Color.theme.textSecondary)
                         .lineLimit(1)
                 }
             }
@@ -554,7 +563,7 @@ struct DocumentRow: View {
 
             Image(systemName: "chevron.right")
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(Color(hex: "e2dfd6"))
+                .foregroundColor(Color.theme.border)
         }
         .padding(.vertical, 6)
     }
@@ -618,7 +627,7 @@ struct DocumentPreviewSheet: View {
                         .foregroundColor(Color(hex: "c1121f"))
                     Text(errorMsg)
                         .font(.custom("DMSans-Regular", size: 14))
-                        .foregroundColor(Color(hex: "3a3d4a"))
+                        .foregroundColor(Color.theme.text)
                     Spacer()
                 } else if isImage, let data = imageData, let uiImage = UIImage(data: data) {
                     ScrollView {
@@ -644,11 +653,11 @@ struct DocumentPreviewSheet: View {
 
                             Text(document.original_name ?? "Document")
                                 .font(.custom("DMSans-SemiBold", size: 16))
-                                .foregroundColor(Color(hex: "0f1117"))
+                                .foregroundColor(Color.theme.text)
 
                             Text("PDF preview is not available in-app.\nThe file is stored on the server.")
                                 .font(.custom("DMSans-Regular", size: 13))
-                                .foregroundColor(Color(hex: "7a7f94"))
+                                .foregroundColor(Color.theme.textSecondary)
                                 .multilineTextAlignment(.center)
 
                             docMeta
@@ -657,7 +666,7 @@ struct DocumentPreviewSheet: View {
                     }
                 }
             }
-            .background(Color(hex: "f5f4f0"))
+            .background(Color.theme.background)
             .navigationTitle(document.original_name ?? "Document")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -694,17 +703,17 @@ struct DocumentPreviewSheet: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("NOTES")
                         .font(.custom("DMSans-SemiBold", size: 9))
-                        .foregroundColor(Color(hex: "7a7f94"))
+                        .foregroundColor(Color.theme.textSecondary)
                         .tracking(0.4)
                     Text(notes)
                         .font(.custom("DMSans-Regular", size: 13))
-                        .foregroundColor(Color(hex: "0f1117"))
+                        .foregroundColor(Color.theme.text)
                 }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .background(Color.white)
+        .background(Color.theme.surface)
         .cornerRadius(12)
         .padding(.horizontal, 16)
     }
@@ -713,11 +722,11 @@ struct DocumentPreviewSheet: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label.uppercased())
                 .font(.custom("DMSans-SemiBold", size: 8))
-                .foregroundColor(Color(hex: "7a7f94"))
+                .foregroundColor(Color.theme.textSecondary)
                 .tracking(0.4)
             Text(value)
                 .font(.custom("DMSans-Medium", size: 13))
-                .foregroundColor(Color(hex: "0f1117"))
+                .foregroundColor(Color.theme.text)
         }
     }
 
@@ -759,7 +768,7 @@ struct UploadDocumentSheet: View {
                             .foregroundColor(Color(hex: "c1121f"))
                             .padding(12)
                             .frame(maxWidth: .infinity)
-                            .background(Color(hex: "ffe5e7"))
+                            .background(Color.theme.red.opacity(0.08))
                             .cornerRadius(8)
                     }
 
@@ -788,15 +797,15 @@ struct UploadDocumentSheet: View {
                                     .font(.custom("DMSans-Medium", size: 14))
                                     .lineLimit(1)
                             }
-                            .foregroundColor(Color(hex: "0f1117"))
+                            .foregroundColor(Color.theme.text)
                             .frame(maxWidth: .infinity)
                             .padding(14)
-                            .background(Color.white)
+                            .background(Color.theme.surface)
                             .cornerRadius(10)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 10)
                                     .stroke(style: StrokeStyle(lineWidth: 1.5, dash: [6]))
-                                    .foregroundColor(Color(hex: "e2dfd6"))
+                                    .foregroundColor(Color.theme.border)
                             )
                         }
                         .onChange(of: selectedItem) { _, newItem in
@@ -821,21 +830,21 @@ struct UploadDocumentSheet: View {
                             .frame(minHeight: 80)
                             .padding(8)
                             .scrollContentBackground(.hidden)
-                            .background(Color.white)
+                            .background(Color.theme.surface)
                             .cornerRadius(8)
-                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: "e2dfd6"), lineWidth: 1))
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.theme.border, lineWidth: 1))
                     }
                 }
                 .padding(20)
             }
-            .background(Color(hex: "f5f4f0"))
+            .background(Color.theme.background)
             .navigationTitle("Upload Document")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") { dismiss() }
                         .font(.custom("DMSans-Regular", size: 14))
-                        .foregroundColor(Color(hex: "7a7f94"))
+                        .foregroundColor(Color.theme.textSecondary)
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: upload) {
@@ -852,7 +861,7 @@ struct UploadDocumentSheet: View {
     private func fieldLabel(_ text: String) -> some View {
         Text(text.uppercased())
             .font(.custom("DMSans-SemiBold", size: 9))
-            .foregroundColor(Color(hex: "7a7f94"))
+            .foregroundColor(Color.theme.textSecondary)
             .tracking(0.4)
     }
 
@@ -925,8 +934,8 @@ struct CollectionSummaryReportView: View {
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
                 }
-                .background(Color(hex: "f5f4f0"))
-                .overlay(Rectangle().fill(Color(hex: "e2dfd6")).frame(height: 1), alignment: .bottom)
+                .background(Color.theme.background)
+                .overlay(Rectangle().fill(Color.theme.border).frame(height: 1), alignment: .bottom)
 
                 if loading {
                     Spacer()
@@ -946,7 +955,7 @@ struct CollectionSummaryReportView: View {
                     Spacer()
                     Text(errorMsg.isEmpty ? "No data" : errorMsg)
                         .font(.custom("DMSans-Regular", size: 14))
-                        .foregroundColor(Color(hex: "7a7f94"))
+                        .foregroundColor(Color.theme.textSecondary)
                     Spacer()
                 }
             }
@@ -972,7 +981,7 @@ struct CollectionSummaryReportView: View {
             }
             HStack(spacing: 12) {
                 statCard(label: "Avg/Pickup", value: String(format: "%.1f gal", s.avg_gallons_per_pickup ?? 0), icon: "chart.bar.fill", color: Color(hex: "1d4e89"))
-                statCard(label: "Date Range", value: dateRange(s.first_pickup, s.last_pickup), icon: "calendar", color: Color(hex: "7a7f94"))
+                statCard(label: "Date Range", value: dateRange(s.first_pickup, s.last_pickup), icon: "calendar", color: Color.theme.textSecondary)
             }
         }
     }
@@ -983,16 +992,16 @@ struct CollectionSummaryReportView: View {
                 Image(systemName: icon).font(.system(size: 12)).foregroundColor(color)
                 Text(label.uppercased())
                     .font(.custom("DMSans-SemiBold", size: 9))
-                    .foregroundColor(Color(hex: "7a7f94"))
+                    .foregroundColor(Color.theme.textSecondary)
                     .tracking(0.4)
             }
             Text(value)
                 .font(.custom("DMSans-SemiBold", size: 16))
-                .foregroundColor(Color(hex: "0f1117"))
+                .foregroundColor(Color.theme.text)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
-        .background(Color.white)
+        .background(Color.theme.surface)
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.04), radius: 4, y: 2)
     }
@@ -1001,12 +1010,12 @@ struct CollectionSummaryReportView: View {
         VStack(alignment: .leading, spacing: 8) {
             Label("Monthly Breakdown", systemImage: "calendar")
                 .font(.custom("Syne-Bold", size: 15))
-                .foregroundColor(Color(hex: "0f1117"))
+                .foregroundColor(Color.theme.text)
             ForEach(monthly) { m in
                 HStack {
                     Text(formatMonth(m.month))
                         .font(.custom("DMSans-Medium", size: 13))
-                        .foregroundColor(Color(hex: "0f1117"))
+                        .foregroundColor(Color.theme.text)
                         .frame(width: 80, alignment: .leading)
                     let maxGal = monthly.compactMap { $0.gallons }.max() ?? 1
                     let pct = (m.gallons ?? 0) / maxGal
@@ -1022,14 +1031,14 @@ struct CollectionSummaryReportView: View {
                         .frame(width: 55, alignment: .trailing)
                     Text("\(m.pickups ?? 0)x")
                         .font(.custom("DMSans-Regular", size: 11))
-                        .foregroundColor(Color(hex: "7a7f94"))
+                        .foregroundColor(Color.theme.textSecondary)
                         .frame(width: 24, alignment: .trailing)
                 }
                 .padding(.vertical, 2)
             }
         }
         .padding(16)
-        .background(Color.white)
+        .background(Color.theme.surface)
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.04), radius: 4, y: 2)
     }
@@ -1038,28 +1047,28 @@ struct CollectionSummaryReportView: View {
         VStack(alignment: .leading, spacing: 8) {
             Label("By Location", systemImage: "mappin.circle.fill")
                 .font(.custom("Syne-Bold", size: 15))
-                .foregroundColor(Color(hex: "0f1117"))
+                .foregroundColor(Color.theme.text)
             ForEach(locs) { loc in
                 HStack {
                     Text(loc.location_label ?? "Unknown")
                         .font(.custom("DMSans-Regular", size: 13))
-                        .foregroundColor(Color(hex: "0f1117"))
+                        .foregroundColor(Color.theme.text)
                         .lineLimit(1)
                     Spacer()
                     Text(String(format: "%.0f gal", loc.gallons ?? 0))
                         .font(.custom("DMSans-SemiBold", size: 12))
                         .foregroundColor(Color(hex: "2d6a4f"))
-                    Text("·").foregroundColor(Color(hex: "e2dfd6"))
+                    Text("·").foregroundColor(Color.theme.border)
                     Text("\(loc.pickups ?? 0) pickups")
                         .font(.custom("DMSans-Regular", size: 11))
-                        .foregroundColor(Color(hex: "7a7f94"))
+                        .foregroundColor(Color.theme.textSecondary)
                 }
                 .padding(.vertical, 2)
                 if loc.id != locs.last?.id { Divider() }
             }
         }
         .padding(16)
-        .background(Color.white)
+        .background(Color.theme.surface)
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.04), radius: 4, y: 2)
     }
@@ -1068,11 +1077,11 @@ struct CollectionSummaryReportView: View {
         Button(action: { period = value }) {
             Text(label)
                 .font(.custom("DMSans-SemiBold", size: 11))
-                .foregroundColor(period == value ? .white : Color(hex: "3a3d4a"))
+                .foregroundColor(period == value ? .white : Color.theme.text)
                 .padding(.horizontal, 12).padding(.vertical, 6)
-                .background(period == value ? Color(hex: "c8893a") : Color.white)
+                .background(period == value ? Color(hex: "c8893a") : Color.theme.surface)
                 .cornerRadius(50)
-                .overlay(RoundedRectangle(cornerRadius: 50).stroke(period == value ? Color.clear : Color(hex: "e2dfd6"), lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: 50).stroke(period == value ? Color.clear : Color.theme.border, lineWidth: 1))
         }
         .buttonStyle(.plain)
     }
@@ -1121,8 +1130,8 @@ struct PickupLogReportView: View {
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
                 }
-                .background(Color(hex: "f5f4f0"))
-                .overlay(Rectangle().fill(Color(hex: "e2dfd6")).frame(height: 1), alignment: .bottom)
+                .background(Color.theme.background)
+                .overlay(Rectangle().fill(Color.theme.border).frame(height: 1), alignment: .bottom)
 
                 if !entries.isEmpty {
                     HStack {
@@ -1130,14 +1139,14 @@ struct PickupLogReportView: View {
                         Label(String(format: "%.0f gal total", totalGal), systemImage: "drop.fill")
                             .font(.custom("DMSans-SemiBold", size: 12))
                             .foregroundColor(Color(hex: "2d6a4f"))
-                        Text("·").foregroundColor(Color(hex: "e2dfd6"))
+                        Text("·").foregroundColor(Color.theme.border)
                         Text("\(entries.count) pickups")
                             .font(.custom("DMSans-SemiBold", size: 12))
-                            .foregroundColor(Color(hex: "7a7f94"))
+                            .foregroundColor(Color.theme.textSecondary)
                         Spacer()
                     }
                     .padding(.horizontal, 16).padding(.vertical, 8)
-                    .background(Color(hex: "f5f4f0"))
+                    .background(Color.theme.background)
                 }
 
                 if loading {
@@ -1150,10 +1159,10 @@ struct PickupLogReportView: View {
                     VStack(spacing: 10) {
                         Image(systemName: "list.clipboard")
                             .font(.system(size: 32))
-                            .foregroundColor(Color(hex: "e2dfd6"))
+                            .foregroundColor(Color.theme.border)
                         Text("No pickups recorded")
                             .font(.custom("DMSans-Regular", size: 14))
-                            .foregroundColor(Color(hex: "7a7f94"))
+                            .foregroundColor(Color.theme.textSecondary)
                     }
                     Spacer()
                 } else {
@@ -1163,7 +1172,7 @@ struct PickupLogReportView: View {
                                 HStack {
                                     Text(formatDate(entry.pickup_date))
                                         .font(.custom("DMSans-SemiBold", size: 13))
-                                        .foregroundColor(Color(hex: "0f1117"))
+                                        .foregroundColor(Color.theme.text)
                                     Spacer()
                                     Text(String(format: "%.1f gal", entry.gallons ?? 0))
                                         .font(.custom("DMSans-SemiBold", size: 13))
@@ -1175,11 +1184,11 @@ struct PickupLogReportView: View {
                                     if !addr.isEmpty {
                                         Text(addr)
                                             .font(.custom("DMSans-Regular", size: 11))
-                                            .foregroundColor(Color(hex: "7a7f94"))
+                                            .foregroundColor(Color.theme.textSecondary)
                                             .lineLimit(1)
                                     }
                                     if let emp = entry.employee_name {
-                                        Text("·").font(.system(size: 8)).foregroundColor(Color(hex: "e2dfd6"))
+                                        Text("·").font(.system(size: 8)).foregroundColor(Color.theme.border)
                                         Text(emp)
                                             .font(.custom("DMSans-Medium", size: 11))
                                             .foregroundColor(Color(hex: "c8893a"))
@@ -1188,7 +1197,7 @@ struct PickupLogReportView: View {
                                 if let notes = entry.notes, !notes.isEmpty {
                                     Text(notes)
                                         .font(.custom("DMSans-Regular", size: 11))
-                                        .foregroundColor(Color(hex: "7a7f94"))
+                                        .foregroundColor(Color.theme.textSecondary)
                                         .lineLimit(1)
                                         .italic()
                                 }
@@ -1217,11 +1226,11 @@ struct PickupLogReportView: View {
         Button(action: { period = value }) {
             Text(label)
                 .font(.custom("DMSans-SemiBold", size: 11))
-                .foregroundColor(period == value ? .white : Color(hex: "3a3d4a"))
+                .foregroundColor(period == value ? .white : Color.theme.text)
                 .padding(.horizontal, 12).padding(.vertical, 6)
-                .background(period == value ? Color(hex: "c8893a") : Color.white)
+                .background(period == value ? Color(hex: "c8893a") : Color.theme.surface)
                 .cornerRadius(50)
-                .overlay(RoundedRectangle(cornerRadius: 50).stroke(period == value ? Color.clear : Color(hex: "e2dfd6"), lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: 50).stroke(period == value ? Color.clear : Color.theme.border, lineWidth: 1))
         }
         .buttonStyle(.plain)
     }
@@ -1261,16 +1270,16 @@ struct CollectionReportsSection: View {
             HStack {
                 Label("Collection Reports", systemImage: "doc.text.fill")
                     .font(.custom("Syne-Bold", size: 16))
-                    .foregroundColor(Color(hex: "0f1117"))
+                    .foregroundColor(Color.theme.text)
                 Spacer()
 
                 if !reports.isEmpty {
                     Text("\(reports.count)")
                         .font(.custom("DMSans-SemiBold", size: 12))
-                        .foregroundColor(Color(hex: "7a7f94"))
+                        .foregroundColor(Color.theme.textSecondary)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 2)
-                        .background(Color(hex: "e2dfd6"))
+                        .background(Color.theme.border)
                         .cornerRadius(50)
                 }
 
@@ -1295,13 +1304,13 @@ struct CollectionReportsSection: View {
                 VStack(spacing: 6) {
                     Image(systemName: "doc.text")
                         .font(.system(size: 28))
-                        .foregroundColor(Color(hex: "e2dfd6"))
+                        .foregroundColor(Color.theme.border)
                     Text("No reports generated yet")
                         .font(.custom("DMSans-Regular", size: 13))
-                        .foregroundColor(Color(hex: "7a7f94"))
+                        .foregroundColor(Color.theme.textSecondary)
                     Text("Tap Generate to create a collection report.")
                         .font(.custom("DMSans-Regular", size: 11))
-                        .foregroundColor(Color(hex: "7a7f94"))
+                        .foregroundColor(Color.theme.textSecondary)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
@@ -1318,7 +1327,7 @@ struct CollectionReportsSection: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(20)
-        .background(Color.white)
+        .background(Color.theme.surface)
         .cornerRadius(16)
         .shadow(color: Color.black.opacity(0.06), radius: 8, y: 2)
         .task { await loadReports() }
@@ -1357,17 +1366,17 @@ struct CollectionReportsSection: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(report.report_name ?? "Report")
                     .font(.custom("DMSans-SemiBold", size: 13))
-                    .foregroundColor(Color(hex: "0f1117"))
+                    .foregroundColor(Color.theme.text)
                     .lineLimit(1)
 
                 HStack(spacing: 8) {
                     let periodStr = formatPeriod(from: report.period_from, to: report.period_to)
                     Text(periodStr)
                         .font(.custom("DMSans-Regular", size: 11))
-                        .foregroundColor(Color(hex: "7a7f94"))
+                        .foregroundColor(Color.theme.textSecondary)
 
                     if let gal = report.total_gallons, gal > 0 {
-                        Text("·").foregroundColor(Color(hex: "e2dfd6"))
+                        Text("·").foregroundColor(Color.theme.border)
                         Text(String(format: "%.0f gal", gal))
                             .font(.custom("DMSans-SemiBold", size: 11))
                             .foregroundColor(Color(hex: "2d6a4f"))
@@ -1377,10 +1386,10 @@ struct CollectionReportsSection: View {
                 HStack(spacing: 8) {
                     Text(formatDate(report.created_at))
                         .font(.custom("DMSans-Regular", size: 10))
-                        .foregroundColor(Color(hex: "7a7f94"))
+                        .foregroundColor(Color.theme.textSecondary)
 
                     if let byName = report.generated_by_name {
-                        Text("·").foregroundColor(Color(hex: "e2dfd6"))
+                        Text("·").foregroundColor(Color.theme.border)
                         Text(byName)
                             .font(.custom("DMSans-Medium", size: 10))
                             .foregroundColor(Color(hex: "c8893a"))
@@ -1523,15 +1532,15 @@ struct GenerateReportSheet: View {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("REPORT DETAILS")
                                 .font(.custom("DMSans-SemiBold", size: 10))
-                                .foregroundColor(Color(hex: "7a7f94"))
+                                .foregroundColor(Color.theme.textSecondary)
                                 .tracking(0.5)
                             Text("Generate a Used Cooking Oil Collection Report PDF with pickup history, gallons collected, and location breakdown.")
                                 .font(.custom("DMSans-Regular", size: 13))
-                                .foregroundColor(Color(hex: "3a3d4a"))
+                                .foregroundColor(Color.theme.text)
                         }
                         .padding(16)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color(hex: "f5f4f0"))
+                        .background(Color.theme.background)
                         .cornerRadius(12)
 
                         // Date range toggle
@@ -1540,10 +1549,10 @@ struct GenerateReportSheet: View {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text("Custom Date Range")
                                         .font(.custom("DMSans-SemiBold", size: 14))
-                                        .foregroundColor(Color(hex: "0f1117"))
+                                        .foregroundColor(Color.theme.text)
                                     Text(useCustomDates ? "Report covers selected dates" : "Report covers all time")
                                         .font(.custom("DMSans-Regular", size: 11))
-                                        .foregroundColor(Color(hex: "7a7f94"))
+                                        .foregroundColor(Color.theme.textSecondary)
                                 }
                             }
                             .tint(Color(hex: "c8893a"))
@@ -1552,16 +1561,16 @@ struct GenerateReportSheet: View {
                                 VStack(spacing: 12) {
                                     DatePicker("From", selection: $fromDate, displayedComponents: .date)
                                         .font(.custom("DMSans-Medium", size: 14))
-                                        .foregroundColor(Color(hex: "0f1117"))
+                                        .foregroundColor(Color.theme.text)
                                     DatePicker("To", selection: $toDate, displayedComponents: .date)
                                         .font(.custom("DMSans-Medium", size: 14))
-                                        .foregroundColor(Color(hex: "0f1117"))
+                                        .foregroundColor(Color.theme.text)
                                 }
                                 .padding(.leading, 4)
                             }
                         }
                         .padding(16)
-                        .background(Color.white)
+                        .background(Color.theme.surface)
                         .cornerRadius(12)
                         .shadow(color: Color.black.opacity(0.04), radius: 4, y: 2)
 
@@ -1574,7 +1583,7 @@ struct GenerateReportSheet: View {
                                         .foregroundColor(Color(hex: "2d6a4f"))
                                     Text(info.report_name ?? "")
                                         .font(.custom("DMSans-Regular", size: 12))
-                                        .foregroundColor(Color(hex: "0f1117"))
+                                        .foregroundColor(Color.theme.text)
                                     HStack(spacing: 12) {
                                         if let gal = info.total_gallons {
                                             Label(String(format: "%.0f gal", gal), systemImage: "drop.fill")
@@ -1589,7 +1598,7 @@ struct GenerateReportSheet: View {
                                         if let period = info.period {
                                             Label(period, systemImage: "calendar")
                                                 .font(.custom("DMSans-Regular", size: 11))
-                                                .foregroundColor(Color(hex: "7a7f94"))
+                                                .foregroundColor(Color.theme.textSecondary)
                                         }
                                     }
                                     HStack(spacing: 4) {
@@ -1610,7 +1619,7 @@ struct GenerateReportSheet: View {
                                 }
                                 .padding(16)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(Color(hex: "d8f3dc"))
+                                .background(Color.theme.green.opacity(0.12))
                                 .cornerRadius(12)
                             }
                             .buttonStyle(.plain)
@@ -1627,7 +1636,7 @@ struct GenerateReportSheet: View {
                             }
                             .padding(12)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color(hex: "fde8e8"))
+                            .background(Color.theme.red.opacity(0.08))
                             .cornerRadius(8)
                         }
                     }
@@ -1650,7 +1659,7 @@ struct GenerateReportSheet: View {
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
-                        .background(generating ? Color(hex: "7a7f94") : Color(hex: "2d6a4f"))
+                        .background(generating ? Color.theme.textSecondary : Color(hex: "2d6a4f"))
                         .cornerRadius(12)
                     }
                     .disabled(generating)

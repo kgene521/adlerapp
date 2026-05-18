@@ -1,4 +1,4 @@
-// /AdlerCRM/Views/MainTabView.swift  08/04/2026 01:22:00 EDT
+// /AdlerCRM/Views/MainTabView.swift  15/04/2026 21:51:00 EDT
 import SwiftUI
 import Combine
 
@@ -19,13 +19,13 @@ struct MoreMenuToolbar: ViewModifier {
                         Button(action: { showMore = true }) {
                             Image(systemName: "line.3.horizontal")
                                 .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(Color(hex: "0f1117"))
+                                .foregroundColor(Color.theme.text)
                         }
                         Button(action: { showNotifications = true }) {
                             ZStack(alignment: .topTrailing) {
                                 Image(systemName: "bell.fill")
                                     .font(.system(size: 15))
-                                    .foregroundColor(notifManager.unreadCount > 0 ? Color(hex: "c8893a") : Color(hex: "7a7f94"))
+                                    .foregroundColor(notifManager.unreadCount > 0 ? Color(hex: "c8893a") : Color.theme.textSecondary)
                                 if notifManager.unreadCount > 0 {
                                     Text("\(min(notifManager.unreadCount, 99))")
                                         .font(.system(size: 9, weight: .bold))
@@ -225,15 +225,15 @@ struct MoreMenuView: View {
                             .frame(width: 44, height: 44)
                         Text(initials(auth.currentUser?.name ?? "?"))
                             .font(.custom("Syne-Bold", size: 16))
-                            .foregroundColor(Color(hex: "0f1117"))
+                            .foregroundColor(Color.theme.text)
                     }
                     VStack(alignment: .leading, spacing: 2) {
                         Text(auth.currentUser?.name ?? "User")
                             .font(.custom("DMSans-SemiBold", size: 16))
-                            .foregroundColor(Color(hex: "0f1117"))
+                            .foregroundColor(Color.theme.text)
                         Text(auth.currentUser?.role ?? "")
                             .font(.custom("DMSans-Regular", size: 13))
-                            .foregroundColor(Color(hex: "7a7f94"))
+                            .foregroundColor(Color.theme.textSecondary)
                     }
                 }
                 .padding(.vertical, 4)
@@ -247,7 +247,7 @@ struct MoreMenuView: View {
                 }
 
                 Label("Employees", systemImage: "person.2.fill")
-                    .foregroundColor(Color(hex: "7a7f94"))
+                    .foregroundColor(Color.theme.textSecondary)
 
                 if canManage {
                     NavigationLink(destination: RegionsView()) {
@@ -261,13 +261,18 @@ struct MoreMenuView: View {
                         Label("Tests", systemImage: "testtube.2")
                             .foregroundColor(Color(hex: "c8893a"))
                     }
+
+                    NavigationLink(destination: AuditLogView()) {
+                        Label("Audit Log", systemImage: "clock.arrow.circlepath")
+                            .foregroundColor(Color(hex: "c8893a"))
+                    }
                 }
             }
 
             // Account
             Section("Account") {
                 Label("Change Password", systemImage: "lock.fill")
-                    .foregroundColor(Color(hex: "7a7f94"))
+                    .foregroundColor(Color.theme.textSecondary)
 
                 Button(action: { auth.logout() }) {
                     Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")

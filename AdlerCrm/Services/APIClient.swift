@@ -1,4 +1,4 @@
-// AdlerCRM/Services/APIClient.swift  07/04/2026 19:36:19
+// /AdlerCRM/Services/APIClient.swift  17/05/2026 23:22:00 EDT
 import Foundation
 
 class APIClient {
@@ -104,8 +104,8 @@ class APIClient {
         HMACSigner.sign(&req)
         let (data, response) = try await URLSession.shared.data(for: req)
         guard let httpResp = response as? HTTPURLResponse else { throw APIClientError.invalidResponse }
-        // Decode response for 200, 401, and 429 (all return LoginResponse-shaped JSON)
-        if [200, 401, 429].contains(httpResp.statusCode) {
+        // Decode response for 200 and 401
+        if [200, 401].contains(httpResp.statusCode) {
             return try JSONDecoder().decode(LoginResponse.self, from: data)
         }
         if let err = try? JSONDecoder().decode(APIError.self, from: data) { throw APIClientError.serverError(err.error) }
@@ -262,13 +262,14 @@ class APIClient {
         return try await request(path: "/collections/business/\(bizId)")
     }
 
-    func createCollection(locationId: Int, pickupDate: String, gallons: Double, notes: String?) async throws -> Collection {
+    func createCollection(locationId: Int, pickupDate: String, gallons: Double, notes: String?, drumId: Int? = nil) async throws -> Collection {
         var body: [String: Any] = [
             "location_id": locationId,
             "pickup_date": pickupDate,
             "gallons": gallons
         ]
         body["notes"] = notes ?? NSNull()
+        if let drumId = drumId { body["drum_id"] = drumId }
         return try await request(path: "/collections", method: "POST", body: body)
     }
 
@@ -338,33 +339,95 @@ class APIClient {
         URL(string: "\(baseURL)/documents/file/\(id)")
     }
 
-    // MARK: - Saved Routes
+    // MARK: - Routes
 
-    func getSavedRoutes(scope: String = "mine", search: String = "", period: String = "") async throws -> [SavedRoute] {
-        var query = "?scope=\(scope)"
-        if !search.isEmpty { query += "&search=\(search.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? search)" }
-        if !period.isEmpty { query += "&period=\(period)" }
-        return try await request(path: "/saved-routes\(query)")
-    }
-
-    func saveRoute(name: String, startName: String?, startLat: Double?, startLng: Double?, stops: [[String: Any]]) async throws -> SavedRoute {
+    func createRoute(name: String, startName: String?, startLat: Double?, startLng: Double?, stops: [[String: Any]], recurrenceStart: String? = nil, recurrenceInterval: Int? = nil, recurrenceUnit: String? = nil) async throws -> SavedRoute {
         var body: [String: Any] = ["name": name, "stops": stops]
         body["start_name"] = startName ?? NSNull()
         body["start_lat"] = startLat ?? NSNull()
         body["start_lng"] = startLng ?? NSNull()
-        return try await request(path: "/saved-routes", method: "POST", body: body)
+        if let rs = recurrenceStart { body["recurrence_start"] = rs }
+        if let ri = recurrenceInterval { body["recurrence_interval"] = ri }
+        if let ru = recurrenceUnit { body["recurrence_unit"] = ru }
+        return try await request(path: "/routes", method: "POST", body: body)
     }
 
-    func deleteSavedRoute(id: Int) async throws -> [String: Bool] {
-        return try await request(path: "/saved-routes/\(id)", method: "DELETE")
+    func createAndAssignRoute(name: String, startName: String?, startLat: Double?, startLng: Double?, stops: [[String: Any]], employeeId: Int, routeDate: String, saveRoute: Bool, recurrenceStart: String? = nil, recurrenceInterval: Int? = nil, recurrenceUnit: String? = nil) async throws -> SavedRoute {
+        var body: [String: Any] = ["name": name, "stops": stops, "employee_id": employeeId, "route_date": routeDate, "save_route": saveRoute]
+        body["start_name"] = startName ?? NSNull()
+        body["start_lat"] = startLat ?? NSNull()
+        body["start_lng"] = startLng ?? NSNull()
+        if let rs = recurrenceStart { body["recurrence_start"] = rs }
+        if let ri = recurrenceInterval { body["recurrence_interval"] = ri }
+        if let ru = recurrenceUnit { body["recurrence_unit"] = ru }
+        return try await request(path: "/routes/create-and-assign", method: "POST", body: body)
     }
 
-    func updateSavedRoute(id: Int, name: String, startName: String?, startLat: Double?, startLng: Double?, stops: [[String: Any]]) async throws -> SavedRoute {
+    func getRoute(id: Int) async throws -> SavedRoute {
+        return try await request(path: "/routes/\(id)")
+    }
+
+    func updateRoute(id: Int, name: String, startName: String?, startLat: Double?, startLng: Double?, stops: [[String: Any]], recurrenceStart: String? = nil, recurrenceInterval: Int? = nil, recurrenceUnit: String? = nil) async throws -> SavedRoute {
         var body: [String: Any] = ["name": name, "stops": stops]
         body["start_name"] = startName ?? NSNull()
         body["start_lat"] = startLat ?? NSNull()
         body["start_lng"] = startLng ?? NSNull()
-        return try await request(path: "/saved-routes/\(id)", method: "PUT", body: body)
+        if let rs = recurrenceStart { body["recurrence_start"] = rs }
+        if let ri = recurrenceInterval { body["recurrence_interval"] = ri }
+        if let ru = recurrenceUnit { body["recurrence_unit"] = ru }
+        return try await request(path: "/routes/\(id)", method: "PUT", body: body)
+    }
+
+    func deleteRoute(id: Int) async throws {
+        struct R: Codable { let ok: Bool? }
+        let _: R = try await request(path: "/routes/\(id)", method: "DELETE")
+    }
+
+    // MARK: - Route Assignment
+
+    func assignRoute(routeId: Int, employeeId: Int, routeDate: String) async throws -> RouteAssignment {
+        return try await request(path: "/routes/\(routeId)/assign", method: "POST", body: [
+            "employee_id": employeeId, "route_date": routeDate
+        ])
+    }
+
+    func getAssignedRoutes(date: String, userId: Int? = nil) async throws -> [SavedRoute] {
+        var query = "?date=\(date)"
+        if let uid = userId { query += "&user_id=\(uid)" }
+        return try await request(path: "/routes/assigned/list\(query)")
+    }
+
+    func getAssignedDates(from: String, to: String, userId: Int? = nil) async throws -> [AssignedDateCount] {
+        var query = "?from=\(from)&to=\(to)"
+        if let uid = userId { query += "&user_id=\(uid)" }
+        return try await request(path: "/routes/assigned/dates\(query)")
+    }
+
+    func unassignRoute(routeId: Int, employeeId: Int, routeDate: String) async throws {
+        struct R: Codable { let ok: Bool? }
+        let _: R = try await request(path: "/routes/\(routeId)/unassign", method: "DELETE", body: [
+            "employee_id": employeeId, "route_date": routeDate
+        ])
+    }
+
+    // MARK: - Saved Routes (personal collection)
+
+    func getSavedRoutesList(search: String = "") async throws -> [SavedRoute] {
+        var query = ""
+        if !search.isEmpty {
+            query = "?search=\(search.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? search)"
+        }
+        return try await request(path: "/routes/saved/list\(query)")
+    }
+
+    func saveRouteToCollection(routeId: Int) async throws {
+        struct R: Codable { let employee_id: Int?; let route_id: Int? }
+        let _: R = try await request(path: "/routes/\(routeId)/save", method: "POST")
+    }
+
+    func unsaveRoute(id: Int) async throws {
+        struct R: Codable { let ok: Bool? }
+        let _: R = try await request(path: "/routes/\(id)/unsave", method: "DELETE")
     }
 
     // MARK: - Contact Endpoints
@@ -488,15 +551,17 @@ class APIClient {
         return try await request(path: "/todos/all?from=\(from)&to=\(to)")
     }
 
-    func createTodo(title: String, description: String?, deadlineDate: String) async throws -> TodoItem {
+    func createTodo(title: String, description: String?, deadlineDate: String, assignedTo: Int? = nil) async throws -> TodoItem {
         var body: [String: Any] = ["title": title, "deadline_date": deadlineDate]
         if let desc = description { body["description"] = desc }
+        if let at = assignedTo { body["assigned_to"] = at }
         return try await request(path: "/todos", method: "POST", body: body)
     }
 
-    func updateTodo(id: Int, title: String, description: String?, deadlineDate: String) async throws -> TodoItem {
+    func updateTodo(id: Int, title: String, description: String?, deadlineDate: String, assignedTo: Int? = nil) async throws -> TodoItem {
         var body: [String: Any] = ["title": title, "deadline_date": deadlineDate]
         if let desc = description { body["description"] = desc }
+        if let at = assignedTo { body["assigned_to"] = at }
         return try await request(path: "/todos/\(id)", method: "PUT", body: body)
     }
 
@@ -606,6 +671,173 @@ class APIClient {
 
     func getEmployees() async throws -> [Employee] {
         return try await request(path: "/employees")
+    }
+
+    // MARK: - Audit Log Endpoints
+
+    func getAuditLogs(limit: Int = 100, offset: Int = 0, action: String? = nil, entityType: String? = nil, entityId: Int? = nil, username: String? = nil, userId: Int? = nil, from: String? = nil, to: String? = nil) async throws -> AuditLogResponse {
+        var params: [String] = ["limit=\(limit)", "offset=\(offset)"]
+        if let action = action, !action.isEmpty { params.append("action=\(action)") }
+        if let entityType = entityType, !entityType.isEmpty { params.append("entity_type=\(entityType)") }
+        if let entityId = entityId { params.append("entity_id=\(entityId)") }
+        if let username = username, !username.isEmpty { params.append("username=\(username.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? username)") }
+        if let userId = userId { params.append("user_id=\(userId)") }
+        if let from = from { params.append("from=\(from)") }
+        if let to = to { params.append("to=\(to)") }
+        let query = params.joined(separator: "&")
+        return try await request(path: "/logs?\(query)")
+    }
+
+    func getAuditLogActions() async throws -> [String] {
+        return try await request(path: "/logs/actions")
+    }
+
+    func getAuditLogEntityTypes() async throws -> [String] {
+        return try await request(path: "/logs/entity-types")
+    }
+
+    func getAuditLogEntityHistory(entityType: String, entityId: Int) async throws -> [AuditLogEntry] {
+        return try await request(path: "/logs/entity/\(entityType)/\(entityId)")
+    }
+
+    func getAuditLogStats() async throws -> AuditLogStatsResponse {
+        return try await request(path: "/logs/stats")
+    }
+
+    func deleteAuditLog(id: Int) async throws {
+        struct R: Codable { let ok: Bool? }
+        let _: R = try await request(path: "/logs/\(id)", method: "DELETE")
+    }
+
+    func purgeAuditLogs(mode: String, from: String? = nil, to: String? = nil, username: String? = nil, days: Int? = nil) async throws -> Int {
+        var body: [String: Any] = ["mode": mode]
+        if let from = from { body["from"] = from }
+        if let to = to { body["to"] = to }
+        if let username = username { body["username"] = username }
+        if let days = days { body["days"] = days }
+        struct R: Codable { let ok: Bool?; let deleted: Int? }
+        let r: R = try await request(path: "/logs/purge", method: "POST", body: body)
+        return r.deleted ?? 0
+    }
+
+    // MARK: - Route Travel Endpoints
+
+    func startTravel(routeName: String, routeId: Int?, latitude: Double, longitude: Double, totalStops: Int) async throws -> TravelSession {
+        var body: [String: Any] = ["route_name": routeName, "latitude": latitude, "longitude": longitude, "total_stops": totalStops]
+        if let routeId = routeId { body["route_id"] = routeId }
+        return try await request(path: "/route-travel/start", method: "POST", body: body)
+    }
+
+    func pauseTravel(sessionId: Int, latitude: Double, longitude: Double) async throws -> TravelSession {
+        return try await request(path: "/route-travel/\(sessionId)/pause", method: "POST", body: ["latitude": latitude, "longitude": longitude])
+    }
+
+    func resumeTravel(sessionId: Int, latitude: Double, longitude: Double) async throws -> TravelSession {
+        return try await request(path: "/route-travel/\(sessionId)/resume", method: "POST", body: ["latitude": latitude, "longitude": longitude])
+    }
+
+    func endTravel(sessionId: Int, latitude: Double, longitude: Double) async throws -> TravelSession {
+        return try await request(path: "/route-travel/\(sessionId)/end", method: "POST", body: ["latitude": latitude, "longitude": longitude])
+    }
+
+    func visitStop(sessionId: Int, latitude: Double, longitude: Double, stopIndex: Int, stopName: String?) async throws -> TravelEvent {
+        var body: [String: Any] = ["latitude": latitude, "longitude": longitude, "stop_index": stopIndex]
+        if let stopName = stopName { body["stop_name"] = stopName }
+        return try await request(path: "/route-travel/\(sessionId)/visit-stop", method: "POST", body: body)
+    }
+
+    func getActiveTravel() async throws -> TravelSession? {
+        // Server returns null if no active session — need custom handling
+        let url = URL(string: "\(baseURL)/route-travel/active")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "GET"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let token = KeychainHelper.load(key: "adler_token") {
+            req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        HMACSigner.sign(&req)
+        let (data, response) = try await URLSession.shared.data(for: req)
+        guard let httpResp = response as? HTTPURLResponse else { throw APIClientError.invalidResponse }
+        if httpResp.statusCode == 401 { NotificationCenter.default.post(name: Notification.Name("adlerSessionExpired"), object: nil); throw APIClientError.unauthorized("Session expired") }
+        if httpResp.statusCode >= 400 { throw APIClientError.serverError("HTTP \(httpResp.statusCode)") }
+        // Check for null response
+        let text = String(data: data, encoding: .utf8) ?? ""
+        if text.trimmingCharacters(in: .whitespaces) == "null" { return nil }
+        return try JSONDecoder().decode(TravelSession.self, from: data)
+    }
+
+    func getTravelSession(id: Int) async throws -> TravelSession {
+        return try await request(path: "/route-travel/\(id)")
+    }
+
+    func getTravelHistory(userId: Int? = nil, limit: Int = 50, offset: Int = 0) async throws -> TravelHistoryResponse {
+        var params = "limit=\(limit)&offset=\(offset)"
+        if let userId = userId { params += "&user_id=\(userId)" }
+        return try await request(path: "/route-travel/history?\(params)")
+    }
+
+    func getTravelUserSummary(userId: Int) async throws -> TravelUserSummary {
+        return try await request(path: "/route-travel/user/\(userId)/summary")
+    }
+
+    // MARK: - Drum Endpoints (NFC)
+
+    func getDrums(businessId: Int? = nil, locationId: Int? = nil, search: String? = nil) async throws -> [Drum] {
+        var params: [String] = []
+        if let businessId = businessId { params.append("business_id=\(businessId)") }
+        if let locationId = locationId { params.append("location_id=\(locationId)") }
+        if let search = search, !search.isEmpty { params.append("search=\(search.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? search)") }
+        let query = params.isEmpty ? "" : "?\(params.joined(separator: "&"))"
+        return try await request(path: "/drums\(query)")
+    }
+
+    func getDrum(id: Int) async throws -> Drum {
+        return try await request(path: "/drums/\(id)")
+    }
+
+    func lookupDrumByTag(tagId: String) async throws -> Drum {
+        let encoded = tagId.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? tagId
+        return try await request(path: "/drums/tag/\(encoded)")
+    }
+
+    func registerDrum(nfcTagId: String, nickname: String?, locationId: Int?, businessId: Int?, latitude: Double?, longitude: Double?, capacityGallons: Int?, tagType: String?) async throws -> Drum {
+        var body: [String: Any] = ["nfc_tag_id": nfcTagId]
+        if let nickname = nickname { body["nickname"] = nickname }
+        if let locationId = locationId { body["location_id"] = locationId }
+        if let businessId = businessId { body["business_id"] = businessId }
+        if let latitude = latitude { body["latitude"] = latitude }
+        if let longitude = longitude { body["longitude"] = longitude }
+        if let capacityGallons = capacityGallons { body["capacity_gallons"] = capacityGallons }
+        if let tagType = tagType { body["tag_type"] = tagType }
+        return try await request(path: "/drums", method: "POST", body: body)
+    }
+
+    func updateDrum(id: Int, nickname: String?, locationId: Int?, businessId: Int?, capacityGallons: Int?, status: String?) async throws -> Drum {
+        var body: [String: Any] = [:]
+        body["nickname"] = nickname ?? NSNull()
+        body["location_id"] = locationId ?? NSNull()
+        body["business_id"] = businessId ?? NSNull()
+        body["capacity_gallons"] = capacityGallons ?? 55
+        body["status"] = status ?? "active"
+        return try await request(path: "/drums/\(id)", method: "PUT", body: body)
+    }
+
+    func scanDrum(id: Int, latitude: Double, longitude: Double) async throws -> DrumScan {
+        return try await request(path: "/drums/\(id)/scan", method: "POST", body: ["latitude": latitude, "longitude": longitude])
+    }
+
+    func moveDrum(id: Int, locationId: Int?, businessId: Int?, latitude: Double?, longitude: Double?) async throws -> Drum {
+        var body: [String: Any] = [:]
+        body["location_id"] = locationId ?? NSNull()
+        body["business_id"] = businessId ?? NSNull()
+        if let latitude = latitude { body["latitude"] = latitude }
+        if let longitude = longitude { body["longitude"] = longitude }
+        return try await request(path: "/drums/\(id)/move", method: "POST", body: body)
+    }
+
+    func retireDrum(id: Int) async throws {
+        struct R: Codable { let ok: Bool? }
+        let _: R = try await request(path: "/drums/\(id)", method: "DELETE")
     }
 }
 

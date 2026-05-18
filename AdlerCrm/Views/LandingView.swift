@@ -1,11 +1,4 @@
-//
-//  LandingView.swift
-//  AdlerCrm
-//
-//  Created by E. K. Khanine on 3/25/26.
-//
-
-// AdlerCRM/Views/LandingView.swift
+// /AdlerCRM/Views/LandingView.swift  08/04/2026 06:00:00 EDT
 import SwiftUI
 
 struct LandingView: View {
@@ -14,30 +7,8 @@ struct LandingView: View {
 
     var body: some View {
         ZStack {
-            // Background gradient
-            LinearGradient(
-                gradient: Gradient(colors: [
-                    Color(hex: "0d1f0f"),
-                    Color(hex: "1a3d20"),
-                    Color(hex: "0a1a0c")
-                ]),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
-
-            // Decorative circles (subtle environmental feel)
-            GeometryReader { geo in
-                Circle()
-                    .fill(Color(hex: "2d6a4f").opacity(0.15))
-                    .frame(width: geo.size.width * 0.8)
-                    .offset(x: -geo.size.width * 0.2, y: -geo.size.height * 0.1)
-
-                Circle()
-                    .fill(Color(hex: "15361e").opacity(0.2))
-                    .frame(width: geo.size.width * 0.6)
-                    .offset(x: geo.size.width * 0.5, y: geo.size.height * 0.5)
-            }
+            Color.theme.surface
+                .ignoresSafeArea()
 
             VStack(spacing: 0) {
                 // Top bar
@@ -52,88 +23,62 @@ struct LandingView: View {
                         VStack(alignment: .leading, spacing: 1) {
                             Text("Adler Resources")
                                 .font(.custom("Syne-Bold", size: 15))
-                                .foregroundColor(.white)
+                                .foregroundColor(Color.theme.text)
                             Text("Used Cooking Oil Management")
                                 .font(.custom("DMSans-Regular", size: 10))
-                                .foregroundColor(.white.opacity(0.45))
+                                .foregroundColor(Color.theme.textSecondary)
                         }
                     }
-
                     Spacer()
-
-                    Button(action: { showLogin = true }) {
-                        Text("Sign In →")
-                            .font(.custom("Syne-SemiBold", size: 13))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 9)
-                            .background(Color.white.opacity(0.08))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 50)
-                                    .stroke(Color.white.opacity(0.2), lineWidth: 1.5)
-                            )
-                            .cornerRadius(50)
-                    }
                 }
                 .padding(.horizontal, 24)
                 .padding(.top, 8)
 
                 Spacer()
 
-                // Hero content
                 VStack(spacing: 0) {
-                    // Logo
                     Image("adler-logo")
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(width: 160, height: 160)
-                        .shadow(color: Color(hex: "52b788").opacity(0.3), radius: 30, y: 8)
                         .padding(.bottom, 28)
                         .opacity(appear ? 1 : 0)
                         .offset(y: appear ? 0 : 20)
 
-                    // Eyebrow
                     HStack(spacing: 8) {
                         Circle()
-                            .fill(Color(hex: "52b788"))
+                            .fill(Color.theme.green)
                             .frame(width: 6, height: 6)
-
                         Text("SUSTAINABLE WASTE-TO-RESOURCE SOLUTIONS")
                             .font(.custom("DMSans-Medium", size: 10))
                             .tracking(1)
-                            .foregroundColor(Color(hex: "52b788"))
+                            .foregroundColor(Color.theme.green)
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 6)
-                    .background(Color(hex: "52b788").opacity(0.15))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 50)
-                            .stroke(Color(hex: "52b788").opacity(0.3), lineWidth: 1)
-                    )
+                    .background(Color.theme.green.opacity(0.08))
+                    .overlay(RoundedRectangle(cornerRadius: 50).stroke(Color.theme.green.opacity(0.2), lineWidth: 1))
                     .cornerRadius(50)
                     .padding(.bottom, 24)
                     .opacity(appear ? 1 : 0)
                     .offset(y: appear ? 0 : 20)
 
-                    // Headline
                     VStack(spacing: 4) {
-                        Text("Turning Waste Oil into")
+                        Text("Used Cooking Oil")
                             .font(.custom("Syne-ExtraBold", size: 32))
-                            .foregroundColor(.white)
-
-                        Text("Renewable Futures")
+                            .foregroundColor(Color.theme.text)
+                        Text("Management")
                             .font(.custom("Syne-ExtraBold", size: 32))
-                            .foregroundColor(Color(hex: "e8a84e"))
+                            .foregroundColor(Color.theme.gold)
                     }
                     .multilineTextAlignment(.center)
                     .padding(.bottom, 20)
                     .opacity(appear ? 1 : 0)
                     .offset(y: appear ? 0 : 20)
 
-                    // Subtitle
                     Text("Adler Resources partners with food businesses across the region to collect, process, and repurpose used cooking oil — keeping waste out of drains and putting it to work as clean, renewable biodiesel.")
                         .font(.custom("DMSans-Regular", size: 14))
-                        .foregroundColor(.white.opacity(0.55))
+                        .foregroundColor(Color.theme.textSecondary)
                         .multilineTextAlignment(.center)
                         .lineSpacing(4)
                         .padding(.horizontal, 32)
@@ -141,16 +86,14 @@ struct LandingView: View {
                         .opacity(appear ? 1 : 0)
                         .offset(y: appear ? 0 : 20)
 
-                    // CTA Button
                     Button(action: { showLogin = true }) {
-                        Text("Open CRM →")
+                        Text("Login")
                             .font(.custom("Syne-Bold", size: 15))
-                            .foregroundColor(Color(hex: "0d1f0f"))
+                            .foregroundColor(.white)
                             .padding(.horizontal, 36)
                             .padding(.vertical, 14)
-                            .background(Color(hex: "c8893a"))
+                            .background(Color.theme.gold)
                             .cornerRadius(50)
-                            .shadow(color: Color(hex: "c8893a").opacity(0.4), radius: 20, y: 6)
                     }
                     .opacity(appear ? 1 : 0)
                     .offset(y: appear ? 0 : 20)
@@ -158,24 +101,13 @@ struct LandingView: View {
 
                 Spacer()
 
-                // Bottom stats
-                HStack(spacing: 0) {
-                    Spacer()
-                    StatItem(value: "101", label: "DEPOT DR.")
-                    Spacer()
-                    StatItem(value: "540", label: "232-9705")
-                    Spacer()
-                    StatItem(value: "VA", label: "BOONES MILL")
-                    Spacer()
-                }
-                .padding(.vertical, 24)
-                .overlay(
-                    Rectangle()
-                        .fill(Color.white.opacity(0.06))
-                        .frame(height: 1),
-                    alignment: .top
-                )
-                .opacity(appear ? 1 : 0)
+                Text("(540) 232-9705")
+                    .font(.custom("Syne-ExtraBold", size: 32))
+                    .foregroundColor(Color.theme.text)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 24)
+                    .overlay(Rectangle().fill(Color.theme.border).frame(height: 1), alignment: .top)
+                    .opacity(appear ? 1 : 0)
             }
         }
         .sheet(isPresented: $showLogin) {
@@ -185,23 +117,6 @@ struct LandingView: View {
             withAnimation(.easeOut(duration: 0.6).delay(0.1)) {
                 appear = true
             }
-        }
-    }
-}
-
-struct StatItem: View {
-    let value: String
-    let label: String
-
-    var body: some View {
-        VStack(spacing: 2) {
-            Text(value)
-                .font(.custom("Syne-ExtraBold", size: 22))
-                .foregroundColor(Color(hex: "52b788"))
-            Text(label)
-                .font(.custom("DMSans-Regular", size: 9))
-                .tracking(0.8)
-                .foregroundColor(.white.opacity(0.4))
         }
     }
 }

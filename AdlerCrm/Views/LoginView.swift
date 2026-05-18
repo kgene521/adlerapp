@@ -1,4 +1,4 @@
-// AdlerCRM/Views/LoginView.swift  03/04/2026 02:16:32
+// /AdlerCRM/Views/LoginView.swift  08/04/2026 06:00:00 EDT
 import SwiftUI
 
 struct LoginView: View {
@@ -32,7 +32,7 @@ struct LoginView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color(hex: "f5f4f0").ignoresSafeArea()
+                Color.theme.background.ignoresSafeArea()
 
                 ScrollView {
                     VStack(spacing: 0) {
@@ -132,7 +132,7 @@ struct LoginView: View {
         .foregroundColor(Color(hex: "c1121f"))
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(hex: "ffe5e7"))
+        .background(Color.theme.red.opacity(0.08))
         .overlay(
             RoundedRectangle(cornerRadius: 8)
                 .stroke(Color(hex: "c1121f").opacity(0.2), lineWidth: 1)
@@ -147,7 +147,7 @@ struct LoginView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Username")
                     .font(.custom("DMSans-SemiBold", size: 13))
-                    .foregroundColor(Color(hex: "3a3d4a"))
+                    .foregroundColor(Color.theme.text)
 
                 TextField("Enter your username", text: $username)
                     .textContentType(.username)
@@ -159,7 +159,7 @@ struct LoginView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Password")
                     .font(.custom("DMSans-SemiBold", size: 13))
-                    .foregroundColor(Color(hex: "3a3d4a"))
+                    .foregroundColor(Color.theme.text)
 
                 SecureField("Enter your password", text: $password)
                     .textContentType(.password)
@@ -188,7 +188,7 @@ struct LoginView: View {
         VStack(spacing: 16) {
             Text("You need an authenticator app to sign in. Scan the QR code below with your app to get started.")
                 .font(.custom("DMSans-Regular", size: 13))
-                .foregroundColor(Color(hex: "7a7f94"))
+                .foregroundColor(Color.theme.textSecondary)
                 .lineSpacing(3)
 
             // App Store link
@@ -202,7 +202,7 @@ struct LoginView: View {
                 .foregroundColor(.white)
                 .padding(.horizontal, 20)
                 .padding(.vertical, 10)
-                .background(Color(hex: "0f1117"))
+                .background(Color.theme.text)
                 .cornerRadius(50)
             }
 
@@ -218,7 +218,7 @@ struct LoginView: View {
                     .cornerRadius(10)
                     .overlay(
                         RoundedRectangle(cornerRadius: 10)
-                            .stroke(Color(hex: "e2dfd6"), lineWidth: 2)
+                            .stroke(Color.theme.border, lineWidth: 2)
                     )
                     .padding(.vertical, 4)
             }
@@ -228,18 +228,18 @@ struct LoginView: View {
                 VStack(spacing: 4) {
                     Text("Manual entry key")
                         .font(.custom("DMSans-Medium", size: 11))
-                        .foregroundColor(Color(hex: "7a7f94"))
+                        .foregroundColor(Color.theme.textSecondary)
                     Text(manualSecret)
                         .font(.system(.caption, design: .monospaced))
-                        .foregroundColor(Color(hex: "0f1117"))
+                        .foregroundColor(Color.theme.text)
                         .padding(10)
                         .frame(maxWidth: .infinity)
-                        .background(Color(hex: "f5f4f0"))
+                        .background(Color.theme.background)
                         .cornerRadius(8)
                         .overlay(
                             RoundedRectangle(cornerRadius: 8)
                                 .stroke(style: StrokeStyle(lineWidth: 1, dash: [4]))
-                                .foregroundColor(Color(hex: "e2dfd6"))
+                                .foregroundColor(Color.theme.border)
                         )
                         .textSelection(.enabled)
                 }
@@ -274,7 +274,7 @@ struct LoginView: View {
         VStack(spacing: 16) {
             Text("Open your authenticator app and enter the 6-digit code for Adler Resources CRM.")
                 .font(.custom("DMSans-Regular", size: 13))
-                .foregroundColor(Color(hex: "7a7f94"))
+                .foregroundColor(Color.theme.textSecondary)
                 .lineSpacing(3)
                 .multilineTextAlignment(.center)
 
@@ -307,13 +307,13 @@ struct LoginView: View {
             .multilineTextAlignment(.center)
             .font(.custom("Syne-Bold", size: 28))
             .tracking(8)
-            .foregroundColor(Color(hex: "0f1117"))
+            .foregroundColor(Color.theme.text)
             .padding(14)
-            .background(Color(hex: "f5f4f0"))
+            .background(Color.theme.background)
             .cornerRadius(10)
             .overlay(
                 RoundedRectangle(cornerRadius: 10)
-                    .stroke(Color(hex: "e2dfd6"), lineWidth: 1.5)
+                    .stroke(Color.theme.border, lineWidth: 1.5)
             )
             .focused($codeFocused)
             .onChange(of: totpCode) { _, newValue in
@@ -330,7 +330,7 @@ struct LoginView: View {
                 Text("Back to sign in")
                     .font(.custom("DMSans-Regular", size: 13))
             }
-            .foregroundColor(Color(hex: "7a7f94"))
+            .foregroundColor(Color.theme.textSecondary)
         }
         .padding(.top, 4)
     }
@@ -338,15 +338,15 @@ struct LoginView: View {
     private func divider(_ text: String) -> some View {
         HStack(spacing: 12) {
             Rectangle()
-                .fill(Color(hex: "e2dfd6"))
+                .fill(Color.theme.border)
                 .frame(height: 1)
             Text(text)
                 .font(.custom("DMSans-Regular", size: 11))
-                .foregroundColor(Color(hex: "7a7f94"))
+                .foregroundColor(Color.theme.textSecondary)
                 .lineLimit(1)
                 .fixedSize()
             Rectangle()
-                .fill(Color(hex: "e2dfd6"))
+                .fill(Color.theme.border)
                 .frame(height: 1)
         }
     }
@@ -387,16 +387,7 @@ struct LoginView: View {
                     step = .totpVerify
                 }
             } else {
-                if result.locked, let mins = result.retryAfterMinutes {
-                    if mins >= 60 {
-                        let hours = mins / 60
-                        error = "Account locked for \(hours) hour\(hours == 1 ? "" : "s") after \(result.consecutiveFailures ?? 0) failed attempts. Try again later."
-                    } else {
-                        error = "Account locked for \(mins) minute\(mins == 1 ? "" : "s") after \(result.consecutiveFailures ?? 0) failed attempts. Try again later."
-                    }
-                } else {
-                    error = result.error ?? "Invalid username or password."
-                }
+                error = result.error ?? "Invalid username or password."
             }
         }
     }
@@ -449,11 +440,11 @@ struct InputFieldStyle: ViewModifier {
         content
             .font(.custom("DMSans-Regular", size: 14))
             .padding(12)
-            .background(Color(hex: "f5f4f0"))
+            .background(Color.theme.background)
             .cornerRadius(10)
             .overlay(
                 RoundedRectangle(cornerRadius: 10)
-                    .stroke(Color(hex: "e2dfd6"), lineWidth: 1.5)
+                    .stroke(Color.theme.border, lineWidth: 1.5)
             )
     }
 }

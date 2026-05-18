@@ -1,4 +1,4 @@
-// AdlerCRM/Views/ContactEventViews.swift  07/04/2026 20:18:54
+// /AdlerCRM/Views/ContactEventViews.swift  10/04/2026 23:27:00 EDT
 import SwiftUI
 import Combine
 
@@ -23,7 +23,7 @@ struct ContactsSection: View {
             HStack {
                 Text("Contacts")
                     .font(.custom("Syne-Bold", size: 16))
-                    .foregroundColor(Color(hex: "0f1117"))
+                    .foregroundColor(Color.theme.text)
                 Spacer()
                 Text("\(contacts.count)")
                     .font(.custom("DMSans-SemiBold", size: 12))
@@ -46,10 +46,10 @@ struct ContactsSection: View {
                 VStack(spacing: 6) {
                     Image(systemName: "person.crop.circle")
                         .font(.system(size: 28))
-                        .foregroundColor(Color(hex: "e2dfd6"))
+                        .foregroundColor(Color.theme.border)
                     Text("No contacts yet")
                         .font(.custom("DMSans-Regular", size: 13))
-                        .foregroundColor(Color(hex: "7a7f94"))
+                        .foregroundColor(Color.theme.textSecondary)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
@@ -69,7 +69,7 @@ struct ContactsSection: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(20)
-        .background(Color.white)
+        .background(Color.theme.surface)
         .cornerRadius(16)
         .shadow(color: Color.black.opacity(0.06), radius: 8, y: 2)
         .sheet(isPresented: $showAddSheet) {
@@ -99,18 +99,18 @@ struct ContactRow: View {
             // Avatar circle
             ZStack {
                 Circle()
-                    .fill(contact.is_primary == true ? Color(hex: "c8893a") : Color(hex: "e2dfd6"))
+                    .fill(contact.is_primary == true ? Color(hex: "c8893a") : Color.theme.border)
                     .frame(width: 32, height: 32)
                 Text(initials)
                     .font(.custom("DMSans-SemiBold", size: 12))
-                    .foregroundColor(contact.is_primary == true ? .white : Color(hex: "7a7f94"))
+                    .foregroundColor(contact.is_primary == true ? .white : Color.theme.textSecondary)
             }
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(contact.name)
                         .font(.custom("DMSans-SemiBold", size: 14))
-                        .foregroundColor(Color(hex: "0f1117"))
+                        .foregroundColor(Color.theme.text)
                     if contact.is_primary == true {
                         Text("Primary")
                             .font(.custom("DMSans-SemiBold", size: 9))
@@ -124,7 +124,7 @@ struct ContactRow: View {
                 if let title = contact.title, !title.isEmpty {
                     Text(title)
                         .font(.custom("DMSans-Regular", size: 12))
-                        .foregroundColor(Color(hex: "7a7f94"))
+                        .foregroundColor(Color.theme.textSecondary)
                 }
             }
 
@@ -134,13 +134,13 @@ struct ContactRow: View {
                 if let phone = contact.phone, !phone.isEmpty {
                     Label(PhoneFormatter.format(phone), systemImage: "phone")
                         .font(.custom("DMSans-Regular", size: 11))
-                        .foregroundColor(Color(hex: "7a7f94"))
+                        .foregroundColor(Color.theme.textSecondary)
                         .lineLimit(1)
                 }
                 if let email = contact.email, !email.isEmpty {
                     Label(email, systemImage: "envelope")
                         .font(.custom("DMSans-Regular", size: 10))
-                        .foregroundColor(Color(hex: "7a7f94"))
+                        .foregroundColor(Color.theme.textSecondary)
                         .lineLimit(1)
                 }
             }
@@ -181,7 +181,7 @@ struct ContactFormSheet: View {
                             .foregroundColor(Color(hex: "c1121f"))
                             .padding(12)
                             .frame(maxWidth: .infinity)
-                            .background(Color(hex: "ffe5e7"))
+                            .background(Color.theme.red.opacity(0.08))
                             .cornerRadius(8)
                     }
 
@@ -197,7 +197,7 @@ struct ContactFormSheet: View {
                     Toggle(isOn: $isPrimary) {
                         Text("Primary Contact")
                             .font(.custom("DMSans-Medium", size: 14))
-                            .foregroundColor(Color(hex: "0f1117"))
+                            .foregroundColor(Color.theme.text)
                     }
                     .tint(Color(hex: "c8893a"))
 
@@ -212,14 +212,14 @@ struct ContactFormSheet: View {
                 }
                 .padding(20)
             }
-            .background(Color(hex: "f5f4f0"))
+            .background(Color.theme.background)
             .navigationTitle(isEditing ? "Edit Contact" : "Add Contact")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") { dismiss() }
                         .font(.custom("DMSans-Regular", size: 14))
-                        .foregroundColor(Color(hex: "7a7f94"))
+                        .foregroundColor(Color.theme.textSecondary)
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: save) {
@@ -250,16 +250,16 @@ struct ContactFormSheet: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label.uppercased())
                 .font(.custom("DMSans-SemiBold", size: 9))
-                .foregroundColor(Color(hex: "7a7f94"))
+                .foregroundColor(Color.theme.textSecondary)
                 .tracking(0.4)
             TextField(placeholder, text: text)
                 .keyboardType(keyboard)
                 .autocapitalization(keyboard == .emailAddress ? .none : .words)
                 .font(.custom("DMSans-Regular", size: 14))
                 .padding(12)
-                .background(Color.white)
+                .background(Color.theme.surface)
                 .cornerRadius(8)
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: "e2dfd6"), lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.theme.border, lineWidth: 1))
         }
     }
 
@@ -324,7 +324,7 @@ struct EventsSection: View {
             HStack {
                 Text("Contact Events")
                     .font(.custom("Syne-Bold", size: 16))
-                    .foregroundColor(Color(hex: "0f1117"))
+                    .foregroundColor(Color.theme.text)
                 Spacer()
                 Text("\(events.count)")
                     .font(.custom("DMSans-SemiBold", size: 12))
@@ -355,10 +355,10 @@ struct EventsSection: View {
                 VStack(spacing: 6) {
                     Image(systemName: "calendar.badge.clock")
                         .font(.system(size: 28))
-                        .foregroundColor(Color(hex: "e2dfd6"))
+                        .foregroundColor(Color.theme.border)
                     Text("No events logged yet")
                         .font(.custom("DMSans-Regular", size: 13))
-                        .foregroundColor(Color(hex: "7a7f94"))
+                        .foregroundColor(Color.theme.textSecondary)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
@@ -378,7 +378,7 @@ struct EventsSection: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(20)
-        .background(Color.white)
+        .background(Color.theme.surface)
         .cornerRadius(16)
         .shadow(color: Color.black.opacity(0.06), radius: 8, y: 2)
         .sheet(isPresented: $showLogSheet) {
@@ -411,7 +411,7 @@ struct EventRow: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(event.subject ?? "No subject")
                     .font(.custom("DMSans-SemiBold", size: 14))
-                    .foregroundColor(Color(hex: "0f1117"))
+                    .foregroundColor(Color.theme.text)
                     .lineLimit(1)
 
                 HStack(spacing: 8) {
@@ -422,7 +422,7 @@ struct EventRow: View {
                     if let contact = event.contact_name, !contact.isEmpty {
                         Text("· \(contact)")
                             .font(.custom("DMSans-Regular", size: 11))
-                            .foregroundColor(Color(hex: "7a7f94"))
+                            .foregroundColor(Color.theme.textSecondary)
                             .lineLimit(1)
                     }
                 }
@@ -433,7 +433,7 @@ struct EventRow: View {
             VStack(alignment: .trailing, spacing: 2) {
                 Text(shortDate(event.event_date))
                     .font(.custom("DMSans-Medium", size: 11))
-                    .foregroundColor(Color(hex: "0f1117"))
+                    .foregroundColor(Color.theme.text)
 
                 if event.follow_up_required == true {
                     HStack(spacing: 3) {
@@ -495,13 +495,13 @@ struct EventDetailSheet: View {
                     // Subject
                     Text(event.subject ?? "No subject")
                         .font(.custom("Syne-Bold", size: 20))
-                        .foregroundColor(Color(hex: "0f1117"))
+                        .foregroundColor(Color.theme.text)
 
                     // Meta grid
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 14) {
                         detailItem(icon: methodIcon, label: "Method", value: event.method ?? "Phone Call", color: methodColor)
-                        detailItem(icon: "calendar", label: "Date", value: formatDate(event.event_date), color: Color(hex: "0f1117"))
-                        detailItem(icon: "person.fill", label: "Logged By", value: event.employee_name ?? "—", color: Color(hex: "7a7f94"))
+                        detailItem(icon: "calendar", label: "Date", value: formatDate(event.event_date), color: Color.theme.text)
+                        detailItem(icon: "person.fill", label: "Logged By", value: event.employee_name ?? "—", color: Color.theme.textSecondary)
 
                         if let contact = event.contact_name, !contact.isEmpty {
                             detailItem(icon: "person.crop.circle", label: "Contact", value: contact, color: Color(hex: "c8893a"))
@@ -525,12 +525,12 @@ struct EventDetailSheet: View {
                                     .tracking(0.4)
                                 Text(formatDate(event.follow_up_date))
                                     .font(.custom("DMSans-SemiBold", size: 14))
-                                    .foregroundColor(Color(hex: "0f1117"))
+                                    .foregroundColor(Color.theme.text)
                             }
                         }
                         .padding(14)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color(hex: "ffe5e7"))
+                        .background(Color.theme.red.opacity(0.08))
                         .cornerRadius(10)
                     }
 
@@ -539,22 +539,22 @@ struct EventDetailSheet: View {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("NOTES")
                                 .font(.custom("DMSans-SemiBold", size: 9))
-                                .foregroundColor(Color(hex: "7a7f94"))
+                                .foregroundColor(Color.theme.textSecondary)
                                 .tracking(0.4)
                             Text(notes)
                                 .font(.custom("DMSans-Regular", size: 14))
-                                .foregroundColor(Color(hex: "0f1117"))
+                                .foregroundColor(Color.theme.text)
                                 .lineSpacing(4)
                         }
                         .padding(16)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color(hex: "f5f4f0"))
+                        .background(Color.theme.background)
                         .cornerRadius(10)
                     }
                 }
                 .padding(20)
             }
-            .background(Color(hex: "f5f4f0"))
+            .background(Color.theme.background)
             .navigationTitle("Event Details")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -576,11 +576,11 @@ struct EventDetailSheet: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(label.uppercased())
                     .font(.custom("DMSans-SemiBold", size: 8))
-                    .foregroundColor(Color(hex: "7a7f94"))
+                    .foregroundColor(Color.theme.textSecondary)
                     .tracking(0.4)
                 Text(value)
                     .font(.custom("DMSans-Medium", size: 13))
-                    .foregroundColor(Color(hex: "0f1117"))
+                    .foregroundColor(Color.theme.text)
                     .lineLimit(2)
             }
         }
@@ -651,7 +651,7 @@ struct LogEventSheet: View {
                             .foregroundColor(Color(hex: "c1121f"))
                             .padding(12)
                             .frame(maxWidth: .infinity)
-                            .background(Color(hex: "ffe5e7"))
+                            .background(Color.theme.red.opacity(0.08))
                             .cornerRadius(8)
                     }
 
@@ -680,9 +680,9 @@ struct LogEventSheet: View {
                         TextField("Brief description of the interaction", text: $subject)
                             .font(.custom("DMSans-Regular", size: 14))
                             .padding(12)
-                            .background(Color.white)
+                            .background(Color.theme.surface)
                             .cornerRadius(8)
-                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: "e2dfd6"), lineWidth: 1))
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.theme.border, lineWidth: 1))
                     }
 
                     // Contact picker
@@ -697,12 +697,12 @@ struct LogEventSheet: View {
                                 }
                             }
                             .pickerStyle(.menu)
-                            .tint(Color(hex: "0f1117"))
+                            .tint(Color.theme.text)
                             .font(.custom("DMSans-Regular", size: 14))
                             .padding(8)
-                            .background(Color.white)
+                            .background(Color.theme.surface)
                             .cornerRadius(8)
-                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: "e2dfd6"), lineWidth: 1))
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.theme.border, lineWidth: 1))
                         }
                     }
 
@@ -718,12 +718,12 @@ struct LogEventSheet: View {
                                 }
                             }
                             .pickerStyle(.menu)
-                            .tint(Color(hex: "0f1117"))
+                            .tint(Color.theme.text)
                             .font(.custom("DMSans-Regular", size: 14))
                             .padding(8)
-                            .background(Color.white)
+                            .background(Color.theme.surface)
                             .cornerRadius(8)
-                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: "e2dfd6"), lineWidth: 1))
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.theme.border, lineWidth: 1))
                         }
                     }
 
@@ -734,16 +734,16 @@ struct LogEventSheet: View {
                             .font(.custom("DMSans-Regular", size: 14))
                             .frame(minHeight: 80)
                             .padding(8)
-                            .background(Color.white)
+                            .background(Color.theme.surface)
                             .cornerRadius(8)
-                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: "e2dfd6"), lineWidth: 1))
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.theme.border, lineWidth: 1))
                     }
 
                     // Follow-up
                     Toggle(isOn: $followUpRequired) {
                         Text("Follow-up Required")
                             .font(.custom("DMSans-Medium", size: 14))
-                            .foregroundColor(Color(hex: "0f1117"))
+                            .foregroundColor(Color.theme.text)
                     }
                     .tint(Color(hex: "c1121f"))
 
@@ -758,14 +758,14 @@ struct LogEventSheet: View {
                 }
                 .padding(20)
             }
-            .background(Color(hex: "f5f4f0"))
+            .background(Color.theme.background)
             .navigationTitle("Log Event")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") { dismiss() }
                         .font(.custom("DMSans-Regular", size: 14))
-                        .foregroundColor(Color(hex: "7a7f94"))
+                        .foregroundColor(Color.theme.textSecondary)
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: save) {
@@ -786,7 +786,7 @@ struct LogEventSheet: View {
     private func fieldLabel(_ text: String) -> some View {
         Text(text.uppercased())
             .font(.custom("DMSans-SemiBold", size: 9))
-            .foregroundColor(Color(hex: "7a7f94"))
+            .foregroundColor(Color.theme.textSecondary)
             .tracking(0.4)
     }
 
@@ -842,14 +842,14 @@ struct NotesSection: View {
             HStack {
                 Label("Notes", systemImage: "note.text")
                     .font(.custom("Syne-Bold", size: 15))
-                    .foregroundColor(Color(hex: "0f1117"))
+                    .foregroundColor(Color.theme.text)
                 if !notes.isEmpty {
                     Text("\(notes.count)")
                         .font(.custom("DMSans-SemiBold", size: 10))
-                        .foregroundColor(Color(hex: "7a7f94"))
+                        .foregroundColor(Color.theme.textSecondary)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 1)
-                        .background(Color(hex: "e2dfd6"))
+                        .background(Color.theme.border)
                         .cornerRadius(50)
                 }
                 Spacer()
@@ -865,7 +865,7 @@ struct NotesSection: View {
             } else if notes.isEmpty {
                 Text("No notes yet")
                     .font(.custom("DMSans-Regular", size: 12))
-                    .foregroundColor(Color(hex: "7a7f94"))
+                    .foregroundColor(Color.theme.textSecondary)
                     .padding(.vertical, 2)
             } else {
                 ForEach(recentNotes) { note in
@@ -897,7 +897,7 @@ struct NotesSection: View {
             }
         }
         .padding(16)
-        .background(Color.white)
+        .background(Color.theme.surface)
         .cornerRadius(14)
         .shadow(color: Color.black.opacity(0.04), radius: 6, y: 2)
         .sheet(isPresented: $showAddSheet) {
@@ -919,14 +919,14 @@ struct NoteRowCompact: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(note.note_text)
                     .font(.custom("DMSans-Regular", size: 13))
-                    .foregroundColor(Color(hex: "0f1117"))
+                    .foregroundColor(Color.theme.text)
                     .lineLimit(1)
                 HStack(spacing: 6) {
                     Text(formatDate(note.created_at))
                         .font(.custom("DMSans-Regular", size: 10))
-                        .foregroundColor(Color(hex: "7a7f94"))
+                        .foregroundColor(Color.theme.textSecondary)
                     if let author = note.created_by_name {
-                        Text("·").font(.system(size: 8)).foregroundColor(Color(hex: "e2dfd6"))
+                        Text("·").font(.system(size: 8)).foregroundColor(Color.theme.border)
                         Text(author)
                             .font(.custom("DMSans-Medium", size: 10))
                             .foregroundColor(Color(hex: "c8893a"))
@@ -936,7 +936,7 @@ struct NoteRowCompact: View {
             Spacer()
             Image(systemName: "chevron.right")
                 .font(.system(size: 9, weight: .semibold))
-                .foregroundColor(Color(hex: "e2dfd6"))
+                .foregroundColor(Color.theme.border)
         }
         .padding(.vertical, 2)
     }
@@ -989,7 +989,7 @@ struct NotesListView: View {
                     Button(action: refresh) {
                         Image(systemName: "arrow.clockwise")
                             .font(.system(size: 14))
-                            .foregroundColor(Color(hex: "7a7f94"))
+                            .foregroundColor(Color.theme.textSecondary)
                     }
                 }
             }
@@ -999,10 +999,10 @@ struct NotesListView: View {
                 VStack(spacing: 10) {
                     Image(systemName: "note.text")
                         .font(.system(size: 32))
-                        .foregroundColor(Color(hex: "e2dfd6"))
+                        .foregroundColor(Color.theme.border)
                     Text("No notes yet")
                         .font(.custom("DMSans-Regular", size: 14))
-                        .foregroundColor(Color(hex: "7a7f94"))
+                        .foregroundColor(Color.theme.textSecondary)
                 }
             }
         }
@@ -1063,7 +1063,7 @@ struct NoteDetailSheet: View {
                             .foregroundColor(Color(hex: "c1121f"))
                             .padding(12)
                             .frame(maxWidth: .infinity)
-                            .background(Color(hex: "ffe5e7"))
+                            .background(Color.theme.red.opacity(0.08))
                             .cornerRadius(8)
                     }
 
@@ -1071,12 +1071,12 @@ struct NoteDetailSheet: View {
                     HStack(spacing: 8) {
                         Image(systemName: "clock")
                             .font(.system(size: 12))
-                            .foregroundColor(Color(hex: "7a7f94"))
+                            .foregroundColor(Color.theme.textSecondary)
                         Text(formatDate(note.created_at))
                             .font(.custom("DMSans-Regular", size: 13))
-                            .foregroundColor(Color(hex: "7a7f94"))
+                            .foregroundColor(Color.theme.textSecondary)
                         if let author = note.created_by_name {
-                            Text("·").foregroundColor(Color(hex: "e2dfd6"))
+                            Text("·").foregroundColor(Color.theme.border)
                             Text(author)
                                 .font(.custom("DMSans-Medium", size: 13))
                                 .foregroundColor(Color(hex: "c8893a"))
@@ -1089,23 +1089,23 @@ struct NoteDetailSheet: View {
                     if isEditing {
                         TextEditor(text: $editText)
                             .font(.custom("DMSans-Regular", size: 15))
-                            .foregroundColor(Color(hex: "0f1117"))
+                            .foregroundColor(Color.theme.text)
                             .frame(minHeight: 200)
                             .padding(8)
-                            .background(Color.white)
+                            .background(Color.theme.surface)
                             .cornerRadius(8)
-                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: "e2dfd6"), lineWidth: 1))
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.theme.border, lineWidth: 1))
                     } else {
                         Text(note.note_text)
                             .font(.custom("DMSans-Regular", size: 15))
-                            .foregroundColor(Color(hex: "0f1117"))
+                            .foregroundColor(Color.theme.text)
                             .textSelection(.enabled)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
                 .padding(20)
             }
-            .background(Color(hex: "f5f4f0"))
+            .background(Color.theme.background)
             .navigationTitle("Note")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -1113,7 +1113,7 @@ struct NoteDetailSheet: View {
                     if isEditing {
                         Button("Cancel") { isEditing = false; editText = note.note_text }
                             .font(.custom("DMSans-Regular", size: 14))
-                            .foregroundColor(Color(hex: "7a7f94"))
+                            .foregroundColor(Color.theme.textSecondary)
                     } else {
                         Button(action: { showDeleteConfirm = true }) {
                             Image(systemName: "trash")
@@ -1209,30 +1209,30 @@ struct AddNoteSheet: View {
                         .foregroundColor(Color(hex: "c1121f"))
                         .padding(12)
                         .frame(maxWidth: .infinity)
-                        .background(Color(hex: "ffe5e7"))
+                        .background(Color.theme.red.opacity(0.08))
                         .cornerRadius(8)
                 }
 
                 TextEditor(text: $noteText)
                     .font(.custom("DMSans-Regular", size: 15))
-                    .foregroundColor(Color(hex: "0f1117"))
+                    .foregroundColor(Color.theme.text)
                     .frame(minHeight: 200)
                     .padding(8)
-                    .background(Color.white)
+                    .background(Color.theme.surface)
                     .cornerRadius(8)
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: "e2dfd6"), lineWidth: 1))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.theme.border, lineWidth: 1))
 
                 Spacer()
             }
             .padding(20)
-            .background(Color(hex: "f5f4f0"))
+            .background(Color.theme.background)
             .navigationTitle("New Note")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") { dismiss() }
                         .font(.custom("DMSans-Regular", size: 14))
-                        .foregroundColor(Color(hex: "7a7f94"))
+                        .foregroundColor(Color.theme.textSecondary)
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: save) {

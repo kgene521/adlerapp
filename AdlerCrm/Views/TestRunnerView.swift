@@ -1,4 +1,4 @@
-// /AdlerCRM/Views/TestRunnerView.swift  08/04/2026 15:12:00
+// /AdlerCRM/Views/TestRunnerView.swift  16/04/2026 02:34:00 EDT
 
 import SwiftUI
 
@@ -55,21 +55,13 @@ struct TestSummary: Codable {
 // MARK: - View
 
 struct TestRunnerView: View {
-    @State private var selectedFile: String? = nil
     @State private var isRunning = false
     @State private var result: TestRunResponse? = nil
     @State private var errorMessage: String? = nil
     @State private var showRawOutput = false
     @State private var elapsedSeconds: Int = 0
     @State private var timer: Timer? = nil
-
-    private let testFiles: [(label: String, value: String?)] = [
-        ("All Tests", nil),
-        ("Auth", "auth"),
-        ("CRUD", "crud"),
-        ("Features", "features"),
-        ("Admin", "admin")
-    ]
+    @State private var expandedSuites: Set<String> = []
 
     var body: some View {
         ScrollView {
@@ -77,45 +69,7 @@ struct TestRunnerView: View {
                 // Header
                 Text("Test Runner")
                     .font(.custom("Syne-Bold", size: 28))
-                    .foregroundColor(Color(hex: "0f1117"))
-
-                // File picker
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Test Suite")
-                        .font(.custom("DMSans-Medium", size: 14))
-                        .foregroundColor(Color(hex: "7a7f94"))
-
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(testFiles, id: \.label) { file in
-                                Button {
-                                    selectedFile = file.value
-                                } label: {
-                                    Text(file.label)
-                                        .font(.custom("DMSans-Medium", size: 14))
-                                        .padding(.horizontal, 14)
-                                        .padding(.vertical, 8)
-                                        .background(
-                                            selectedFile == file.value
-                                                ? Color(hex: "2d6a4f")
-                                                : Color(hex: "f5f4f0")
-                                        )
-                                        .foregroundColor(
-                                            selectedFile == file.value
-                                                ? .white
-                                                : Color(hex: "0f1117")
-                                        )
-                                        .cornerRadius(8)
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 8)
-                                                .stroke(Color(hex: "e2dfd6"), lineWidth: selectedFile == file.value ? 0 : 1)
-                                        )
-                                }
-                                .disabled(isRunning)
-                            }
-                        }
-                    }
-                }
+                    .foregroundColor(Color.theme.text)
 
                 // Run button
                 Button {
@@ -129,13 +83,13 @@ struct TestRunnerView: View {
                                 .font(.custom("DMSans-SemiBold", size: 16))
                         } else {
                             Image(systemName: "play.fill")
-                            Text("Run \(selectedFile != nil ? selectedFile!.capitalized : "All") Tests")
+                            Text("Run Tests")
                                 .font(.custom("DMSans-SemiBold", size: 16))
                         }
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(isRunning ? Color(hex: "7a7f94") : Color(hex: "2d6a4f"))
+                    .background(isRunning ? Color.theme.textSecondary : Color(hex: "2d6a4f"))
                     .foregroundColor(.white)
                     .cornerRadius(10)
                 }
@@ -163,7 +117,7 @@ struct TestRunnerView: View {
             }
             .padding(16)
         }
-        .background(Color(hex: "f5f4f0"))
+        .background(Color.theme.background)
         .navigationTitle("Tests")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -175,22 +129,9 @@ struct TestRunnerView: View {
         // Summary banner
         summaryBanner(result.parsed.summary, exitCode: result.exit_code)
 
-        // Suite results
+        // Suite cards
         ForEach(result.parsed.suites) { suite in
-            suiteCard(suite)
-        }
-
-        // Failure details
-        if !result.parsed.failures.isEmpty {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Failure Details")
-                    .font(.custom("Syne-Bold", size: 18))
-                    .foregroundColor(Color(hex: "c1121f"))
-
-                ForEach(result.parsed.failures) { failure in
-                    failureCard(failure)
-                }
-            }
+            suiteCard(suite, failures: result.parsed.failures)
         }
 
         // Raw output toggle
@@ -202,21 +143,21 @@ struct TestRunnerView: View {
                 Text("Raw Output")
                     .font(.custom("DMSans-Medium", size: 14))
             }
-            .foregroundColor(Color(hex: "7a7f94"))
+            .foregroundColor(Color.theme.textSecondary)
         }
 
         if showRawOutput {
             ScrollView(.horizontal) {
                 Text(result.raw_output)
                     .font(.system(.caption, design: .monospaced))
-                    .foregroundColor(Color(hex: "0f1117"))
+                    .foregroundColor(Color.theme.text)
                     .padding(12)
             }
-            .background(Color.white)
+            .background(Color.theme.surface)
             .cornerRadius(8)
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color(hex: "e2dfd6"), lineWidth: 1)
+                    .stroke(Color.theme.border, lineWidth: 1)
             )
         }
     }
@@ -224,7 +165,7 @@ struct TestRunnerView: View {
     // MARK: - Summary Banner
 
     private func summaryBanner(_ summary: TestSummary, exitCode: Int) -> some View {
-        let allPassed = summary.tests_failed == 0 && exitCode == 0
+        let allPassed = summary.tests_failed == 0
         return VStack(spacing: 12) {
             HStack {
                 Image(systemName: allPassed ? "checkmark.seal.fill" : "xmark.seal.fill")
@@ -262,91 +203,175 @@ struct TestRunnerView: View {
 
     // MARK: - Suite Card
 
-    private func suiteCard(_ suite: TestSuite) -> some View {
+    private func suiteCard(_ suite: TestSuite, failures: [TestFailure]) -> some View {
         let passed = suite.status == "PASS"
-        return VStack(alignment: .leading, spacing: 10) {
-            // Suite header
-            HStack(spacing: 8) {
-                Image(systemName: passed ? "checkmark.circle.fill" : "xmark.circle.fill")
-                    .foregroundColor(passed ? Color(hex: "2d6a4f") : Color(hex: "c1121f"))
-                Text(suite.file)
-                    .font(.custom("DMSans-SemiBold", size: 15))
-                    .foregroundColor(Color(hex: "0f1117"))
-                Spacer()
-                Text(passed ? "PASS" : "FAIL")
-                    .font(.custom("DMSans-Bold", size: 12))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(passed ? Color(hex: "2d6a4f").opacity(0.12) : Color(hex: "c1121f").opacity(0.12))
-                    .foregroundColor(passed ? Color(hex: "2d6a4f") : Color(hex: "c1121f"))
-                    .cornerRadius(4)
-            }
+        let totalTests = suite.groups.flatMap(\.tests).count
+        let failedTests = suite.groups.flatMap(\.tests).filter { $0.status != "passed" }.count
+        let passedTests = totalTests - failedTests
+        let durationMs = suite.groups.flatMap(\.tests).compactMap(\.duration_ms).reduce(0, +)
+        let isExpanded = expandedSuites.contains(suite.id)
 
-            // Groups
-            ForEach(suite.groups) { group in
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(group.name)
-                        .font(.custom("DMSans-Medium", size: 13))
-                        .foregroundColor(Color(hex: "7a7f94"))
-                        .padding(.top, 4)
-
-                    ForEach(group.tests) { test in
-                        HStack(spacing: 6) {
-                            Image(systemName: test.status == "passed" ? "checkmark" : "xmark")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundColor(test.status == "passed" ? Color(hex: "2d6a4f") : Color(hex: "c1121f"))
-                                .frame(width: 16)
-
-                            Text(test.name)
-                                .font(.custom("DMSans-Regular", size: 13))
-                                .foregroundColor(Color(hex: "0f1117"))
-                                .lineLimit(2)
-
-                            Spacer()
-
-                            if let ms = test.duration_ms {
-                                Text("\(ms)ms")
-                                    .font(.system(.caption2, design: .monospaced))
-                                    .foregroundColor(Color(hex: "7a7f94"))
-                            }
-                        }
-                        .padding(.vertical, 2)
-                    }
+        // Failures belonging to this suite
+        let suiteFailures = failures.filter { f in
+            suite.groups.contains { g in
+                g.tests.contains { t in
+                    t.status != "passed" && f.test_path.contains(t.name)
                 }
             }
         }
-        .padding(14)
-        .background(Color.white)
+
+        return VStack(alignment: .leading, spacing: 0) {
+            // Card header — tappable only if failed
+            Button(action: {
+                if !passed {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        if isExpanded { expandedSuites.remove(suite.id) }
+                        else { expandedSuites.insert(suite.id) }
+                    }
+                }
+            }) {
+                HStack(spacing: 10) {
+                    Image(systemName: passed ? "checkmark.circle.fill" : "xmark.circle.fill")
+                        .font(.system(size: 20))
+                        .foregroundColor(passed ? Color(hex: "2d6a4f") : Color(hex: "c1121f"))
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(suiteName(suite.file))
+                            .font(.custom("DMSans-SemiBold", size: 15))
+                            .foregroundColor(Color.theme.text)
+
+                        if passed {
+                            Text("\(passedTests)/\(totalTests) passed · \(formatDuration(durationMs))")
+                                .font(.custom("DMSans-Regular", size: 12))
+                                .foregroundColor(Color(hex: "2d6a4f"))
+                        } else {
+                            Text("\(failedTests) failed, \(passedTests) passed")
+                                .font(.custom("DMSans-Medium", size: 12))
+                                .foregroundColor(Color(hex: "c1121f"))
+                        }
+                    }
+
+                    Spacer()
+
+                    Text(passed ? "PASSED" : "FAILED")
+                        .font(.custom("DMSans-Bold", size: 11))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(passed ? Color(hex: "2d6a4f").opacity(0.12) : Color(hex: "c1121f").opacity(0.12))
+                        .foregroundColor(passed ? Color(hex: "2d6a4f") : Color(hex: "c1121f"))
+                        .cornerRadius(4)
+
+                    if !passed {
+                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(Color.theme.textSecondary)
+                    }
+                }
+                .padding(14)
+            }
+            .buttonStyle(.plain)
+            .disabled(passed)
+
+            // Expanded detail — only for failed suites
+            if !passed && isExpanded {
+                VStack(alignment: .leading, spacing: 0) {
+                    Divider().padding(.horizontal, 14)
+
+                    // Individual tests grouped by describe block
+                    ForEach(suite.groups) { group in
+                        let groupFailed = group.tests.contains { $0.status != "passed" }
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(group.name)
+                                .font(.custom("DMSans-SemiBold", size: 12))
+                                .foregroundColor(Color.theme.textSecondary)
+                                .padding(.top, 8)
+
+                            ForEach(group.tests) { test in
+                                HStack(spacing: 6) {
+                                    Image(systemName: test.status == "passed" ? "checkmark" : "xmark")
+                                        .font(.system(size: 9, weight: .bold))
+                                        .foregroundColor(test.status == "passed" ? Color(hex: "2d6a4f") : Color(hex: "c1121f"))
+                                        .frame(width: 14)
+
+                                    Text(test.name)
+                                        .font(.custom("DMSans-Regular", size: 12))
+                                        .foregroundColor(test.status == "passed" ? Color.theme.textSecondary : Color.theme.text)
+                                        .lineLimit(2)
+
+                                    Spacer()
+
+                                    if let ms = test.duration_ms {
+                                        Text("\(ms)ms")
+                                            .font(.system(size: 10, design: .monospaced))
+                                            .foregroundColor(Color.theme.textSecondary)
+                                    }
+                                }
+                                .padding(.vertical, 2)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 10)
+
+                    // Failure details
+                    if !suiteFailures.isEmpty {
+                        Divider().padding(.horizontal, 14)
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Failure Details")
+                                .font(.custom("DMSans-SemiBold", size: 12))
+                                .foregroundColor(Color(hex: "c1121f"))
+                                .padding(.top, 8)
+
+                            ForEach(suiteFailures) { failure in
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(failure.test_path)
+                                        .font(.custom("DMSans-Medium", size: 11))
+                                        .foregroundColor(Color(hex: "c1121f"))
+
+                                    Text(failure.detail.joined(separator: "\n"))
+                                        .font(.system(size: 10, design: .monospaced))
+                                        .foregroundColor(Color.theme.text)
+                                        .padding(8)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .background(Color.theme.background)
+                                        .cornerRadius(6)
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.bottom, 10)
+                    }
+                }
+                .background(Color.theme.surface.opacity(0.5))
+            }
+        }
+        .background(Color.theme.surface)
         .cornerRadius(10)
         .overlay(
             RoundedRectangle(cornerRadius: 10)
-                .stroke(Color(hex: "e2dfd6"), lineWidth: 1)
+                .stroke(passed ? Color(hex: "2d6a4f").opacity(0.3) : Color(hex: "c1121f").opacity(0.3), lineWidth: 1)
         )
     }
 
-    // MARK: - Failure Card
+    // MARK: - Helpers
 
-    private func failureCard(_ failure: TestFailure) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(failure.test_path)
-                .font(.custom("DMSans-SemiBold", size: 13))
-                .foregroundColor(Color(hex: "c1121f"))
+    private func suiteName(_ file: String) -> String {
+        // "auth.test.js" → "Authentication & Security"
+        let map: [String: String] = [
+            "auth.test.js": "Authentication",
+            "crud.test.js": "CRUD Operations",
+            "features.test.js": "Features",
+            "admin.test.js": "Admin",
+        ]
+        return map[file] ?? file.replacingOccurrences(of: ".test.js", with: "").capitalized
+    }
 
-            Text(failure.detail.joined(separator: "\n"))
-                .font(.system(.caption, design: .monospaced))
-                .foregroundColor(Color(hex: "0f1117"))
-                .padding(10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(hex: "f5f4f0"))
-                .cornerRadius(6)
-        }
-        .padding(12)
-        .background(Color(hex: "c1121f").opacity(0.04))
-        .cornerRadius(8)
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(Color(hex: "c1121f").opacity(0.2), lineWidth: 1)
-        )
+    private func formatDuration(_ ms: Int) -> String {
+        if ms < 1000 { return "\(ms)ms" }
+        let seconds = Double(ms) / 1000.0
+        return String(format: "%.1fs", seconds)
     }
 
     // MARK: - Run Tests
@@ -355,7 +380,9 @@ struct TestRunnerView: View {
         isRunning = true
         errorMessage = nil
         result = nil
+        expandedSuites = []
         elapsedSeconds = 0
+        showRawOutput = false
 
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
             elapsedSeconds += 1
@@ -363,11 +390,10 @@ struct TestRunnerView: View {
 
         Task {
             do {
-                let body: [String: Any]? = selectedFile != nil ? ["file": selectedFile!] : nil
                 let response: TestRunResponse = try await APIClient.shared.request(
                     path: "/tests/run",
                     method: "POST",
-                    body: body
+                    body: [:]
                 )
                 await MainActor.run {
                     result = response

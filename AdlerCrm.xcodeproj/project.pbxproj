@@ -282,6 +282,8 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = AdlerCrm/Info.plist;
+				INFOPLIST_KEY_NFCReaderUsageDescription = "";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Allow Adler CRM access camera";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "AdlerCRM uses your location to calculate the nearest collection routes and set your starting or destination point. ";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -316,6 +318,8 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = AdlerCrm/Info.plist;
+				INFOPLIST_KEY_NFCReaderUsageDescription = "";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Allow Adler CRM access camera";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "AdlerCRM uses your location to calculate the nearest collection routes and set your starting or destination point. ";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;

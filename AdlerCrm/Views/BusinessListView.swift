@@ -1,4 +1,4 @@
-// AdlerCRM/Views/BusinessListView.swift  07/04/2026 20:28:49
+// /AdlerCRM/Views/BusinessListView.swift  16/04/2026 00:10:00 EDT
 import SwiftUI
 import Combine
 
@@ -33,7 +33,7 @@ struct BusinessListView: View {
             if !showInactive && b.status == "inactive" { return false }
 
             if !searchText.isEmpty {
-                let searchable = [b.name, b.first_address, b.first_city]
+                let searchable = [b.name, b.first_address, b.first_city, b.region_name]
                     .compactMap { $0 }.joined(separator: " ")
                 if !searchable.localizedCaseInsensitiveContains(searchText) { return false }
             }
@@ -93,16 +93,16 @@ struct BusinessListView: View {
                     }
                     Button(action: { withAnimation { showFilters.toggle() } }) {
                         Image(systemName: hasActiveFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
-                            .foregroundColor(hasActiveFilters ? Color(hex: "c8893a") : Color(hex: "7a7f94"))
+                            .foregroundColor(hasActiveFilters ? Color(hex: "c8893a") : Color.theme.textSecondary)
                     }
                     Button(action: loadData) {
                         Image(systemName: "arrow.clockwise")
-                            .foregroundColor(Color(hex: "7a7f94"))
+                            .foregroundColor(Color.theme.textSecondary)
                     }
                 }
             }
         }
-        .searchable(text: $searchText, prompt: "Search by name, address, or city")
+        .searchable(text: $searchText, prompt: "Search by name, address, city, or region")
         .task { await loadDataAsync() }
         .sheet(isPresented: $showAddSheet) {
             AddBusinessSheet(regions: regions, onSave: loadData)
@@ -122,14 +122,14 @@ struct BusinessListView: View {
             HStack {
                 Text("\(filtered.count) of \(businesses.count) businesses")
                     .font(.custom("DMSans-Regular", size: 12))
-                    .foregroundColor(Color(hex: "7a7f94"))
+                    .foregroundColor(Color.theme.textSecondary)
 
                 Spacer()
 
                 Toggle(isOn: $showInactive) {
                     Text("Inactive")
                         .font(.custom("DMSans-Regular", size: 12))
-                        .foregroundColor(Color(hex: "7a7f94"))
+                        .foregroundColor(Color.theme.textSecondary)
                 }
                 .toggleStyle(.switch)
                 .tint(Color(hex: "c8893a"))
@@ -137,7 +137,7 @@ struct BusinessListView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
-            .background(Color(hex: "f5f4f0"))
+            .background(Color.theme.background)
 
             // Business list
             if filtered.isEmpty {
@@ -162,14 +162,14 @@ struct BusinessListView: View {
                         .frame(width: 48)
                 }
                 .font(.custom("DMSans-SemiBold", size: 9))
-                .foregroundColor(Color(hex: "7a7f94"))
+                .foregroundColor(Color.theme.textSecondary)
                 .tracking(0.3)
                 .multilineTextAlignment(.center)
                 .padding(.leading, 20)
                 .padding(.trailing, 46)
                 .padding(.vertical, 6)
-                .background(Color(hex: "f5f4f0"))
-                .overlay(Rectangle().fill(Color(hex: "e2dfd6")).frame(height: 1), alignment: .bottom)
+                .background(Color.theme.background)
+                .overlay(Rectangle().fill(Color.theme.border).frame(height: 1), alignment: .bottom)
 
                 List {
                     ForEach(Array(filtered.enumerated()), id: \.element.id) { idx, biz in
@@ -181,7 +181,7 @@ struct BusinessListView: View {
                         )) {
                             BusinessRow(index: idx + 1, business: biz)
                         }
-                        .listRowBackground(idx % 2 == 0 ? Color.white : Color(hex: "f9f8f6"))
+                        .listRowBackground(idx % 2 == 0 ? Color.theme.surface : Color.theme.background)
                     }
                 }
                 .listStyle(.plain)
@@ -198,7 +198,7 @@ struct BusinessListView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("REGION")
                         .font(.custom("DMSans-SemiBold", size: 9))
-                        .foregroundColor(Color(hex: "7a7f94"))
+                        .foregroundColor(Color.theme.textSecondary)
                         .tracking(0.5)
                     Picker("Region", selection: $filterRegion) {
                         Text("All").tag("")
@@ -208,7 +208,7 @@ struct BusinessListView: View {
                         }
                     }
                     .pickerStyle(.menu)
-                    .tint(Color(hex: "0f1117"))
+                    .tint(Color.theme.text)
                     .font(.custom("DMSans-Regular", size: 13))
                 }
 
@@ -224,8 +224,8 @@ struct BusinessListView: View {
             }
         }
         .padding(12)
-        .background(Color(hex: "f5f4f0"))
-        .overlay(Rectangle().fill(Color(hex: "e2dfd6")).frame(height: 1), alignment: .bottom)
+        .background(Color.theme.background)
+        .overlay(Rectangle().fill(Color.theme.border).frame(height: 1), alignment: .bottom)
         .transition(.move(edge: .top).combined(with: .opacity))
     }
 
@@ -236,13 +236,13 @@ struct BusinessListView: View {
             Spacer()
             Image(systemName: "building.2")
                 .font(.system(size: 40))
-                .foregroundColor(Color(hex: "7a7f94").opacity(0.4))
+                .foregroundColor(Color.theme.textSecondary.opacity(0.4))
             Text("No businesses found")
                 .font(.custom("Syne-Bold", size: 17))
-                .foregroundColor(Color(hex: "3a3d4a"))
+                .foregroundColor(Color.theme.text)
             Text("Try adjusting your filters or search.")
                 .font(.custom("DMSans-Regular", size: 14))
-                .foregroundColor(Color(hex: "7a7f94"))
+                .foregroundColor(Color.theme.textSecondary)
             Spacer()
         }
     }
@@ -255,14 +255,14 @@ struct BusinessListView: View {
                 .foregroundColor(Color(hex: "c1121f"))
             Text(errorMsg)
                 .font(.custom("DMSans-Regular", size: 14))
-                .foregroundColor(Color(hex: "3a3d4a"))
+                .foregroundColor(Color.theme.text)
                 .multilineTextAlignment(.center)
             Button("Retry") { loadData() }
                 .font(.custom("DMSans-SemiBold", size: 14))
                 .foregroundColor(.white)
                 .padding(.horizontal, 24)
                 .padding(.vertical, 10)
-                .background(Color(hex: "0f1117"))
+                .background(Color.theme.text)
                 .cornerRadius(8)
             Spacer()
         }
@@ -297,7 +297,7 @@ struct BusinessListView: View {
                         .font(.system(size: 6, weight: .bold))
                 }
             }
-            .foregroundColor(sortColumn == column ? Color(hex: "c8893a") : Color(hex: "7a7f94"))
+            .foregroundColor(sortColumn == column ? Color(hex: "c8893a") : Color.theme.textSecondary)
         }
         .buttonStyle(.plain)
     }
@@ -343,12 +343,12 @@ struct BusinessRow: View {
         HStack(spacing: 0) {
             Text("\(index)")
                 .font(.custom("DMSans-Regular", size: 11))
-                .foregroundColor(Color(hex: "7a7f94"))
+                .foregroundColor(Color.theme.textSecondary)
                 .frame(width: 22, alignment: .trailing)
 
             Text(business.name)
                 .font(.custom("DMSans-SemiBold", size: 14))
-                .foregroundColor(Color(hex: "0f1117"))
+                .foregroundColor(Color.theme.text)
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .padding(.leading, 6)
@@ -358,23 +358,23 @@ struct BusinessRow: View {
             let gal = business.total_est_gallons ?? 0
             Text(gal > 0 ? "\(gal)" : "—")
                 .font(.custom("DMSans-Medium", size: 11))
-                .foregroundColor(gal > 0 ? Color(hex: "2d6a4f") : Color(hex: "7a7f94"))
+                .foregroundColor(gal > 0 ? Color(hex: "2d6a4f") : Color.theme.textSecondary)
                 .frame(width: 36)
 
             Text(nextCallDate() ?? "—")
                 .font(.custom("DMSans-Regular", size: 11))
-                .foregroundColor(Color(hex: "7a7f94"))
+                .foregroundColor(Color.theme.textSecondary)
                 .frame(width: 44)
 
             Text(business.region_name ?? "—")
                 .font(.custom("DMSans-Medium", size: 11))
-                .foregroundColor(business.region_name != nil ? Color(hex: "c8893a") : Color(hex: "7a7f94"))
+                .foregroundColor(business.region_name != nil ? Color(hex: "c8893a") : Color.theme.textSecondary)
                 .lineLimit(1)
                 .frame(width: 48)
 
             if business.status == "inactive" {
                 Circle()
-                    .fill(Color(hex: "e2dfd6"))
+                    .fill(Color.theme.border)
                     .frame(width: 8, height: 8)
             }
         }
@@ -425,23 +425,23 @@ struct BusinessDetailView: View {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(business.name)
                             .font(.custom("Syne-ExtraBold", size: 20))
-                            .foregroundColor(Color(hex: "0f1117"))
+                            .foregroundColor(Color.theme.text)
                         HStack(spacing: 6) {
                             Image(systemName: "map.circle.fill")
                                 .font(.system(size: 11))
                                 .foregroundColor(Color(hex: "c8893a"))
                             Text(business.region_name ?? "Unassigned")
                                 .font(.custom("DMSans-Medium", size: 12))
-                                .foregroundColor(Color(hex: "7a7f94"))
+                                .foregroundColor(Color.theme.textSecondary)
                         }
                     }
                     Spacer()
                     Text(business.status ?? "active")
                         .font(.custom("DMSans-SemiBold", size: 10))
-                        .foregroundColor(business.status == "active" ? Color(hex: "2d6a4f") : Color(hex: "7a7f94"))
+                        .foregroundColor(business.status == "active" ? Color(hex: "2d6a4f") : Color.theme.textSecondary)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
-                        .background(business.status == "active" ? Color(hex: "d8f3dc") : Color(hex: "e2dfd6"))
+                        .background(business.status == "active" ? Color.theme.green.opacity(0.12) : Color.theme.border)
                         .cornerRadius(50)
                 }
                 .padding(.horizontal, 16)
@@ -464,14 +464,14 @@ struct BusinessDetailView: View {
                     HStack {
                         Label("Locations", systemImage: "mappin.circle.fill")
                             .font(.custom("Syne-Bold", size: 15))
-                            .foregroundColor(Color(hex: "0f1117"))
+                            .foregroundColor(Color.theme.text)
                         Spacer()
                         Text("\(activeLocations.count)")
                             .font(.custom("DMSans-SemiBold", size: 11))
                             .foregroundColor(Color(hex: "2d6a4f"))
                             .padding(.horizontal, 7)
                             .padding(.vertical, 2)
-                            .background(Color(hex: "d8f3dc"))
+                            .background(Color.theme.green.opacity(0.12))
                             .cornerRadius(50)
                         if !deletedLocations.isEmpty {
                             Button(action: { withAnimation { showDeletedLocations.toggle() } }) {
@@ -481,10 +481,10 @@ struct BusinessDetailView: View {
                                     Text("\(deletedLocations.count)")
                                         .font(.custom("DMSans-SemiBold", size: 10))
                                 }
-                                .foregroundColor(showDeletedLocations ? .white : Color(hex: "7a7f94"))
+                                .foregroundColor(showDeletedLocations ? .white : Color.theme.textSecondary)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
-                                .background(showDeletedLocations ? Color(hex: "c1121f").opacity(0.7) : Color(hex: "e2dfd6"))
+                                .background(showDeletedLocations ? Color(hex: "c1121f").opacity(0.7) : Color.theme.border)
                                 .cornerRadius(50)
                             }
                         }
@@ -500,7 +500,7 @@ struct BusinessDetailView: View {
                     } else if activeLocations.isEmpty && !showDeletedLocations {
                         Text("No active locations.")
                             .font(.custom("DMSans-Regular", size: 13))
-                            .foregroundColor(Color(hex: "7a7f94"))
+                            .foregroundColor(Color.theme.textSecondary)
                             .padding(.vertical, 4)
                     } else {
                         // Active locations
@@ -547,7 +547,7 @@ struct BusinessDetailView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(16)
-                .background(Color.white)
+                .background(Color.theme.surface)
                 .cornerRadius(14)
                 .shadow(color: Color.black.opacity(0.04), radius: 6, y: 2)
                 .sheet(isPresented: $showAddLocation) {
@@ -575,7 +575,7 @@ struct BusinessDetailView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Label("Details", systemImage: "info.circle.fill")
                         .font(.custom("Syne-Bold", size: 15))
-                        .foregroundColor(Color(hex: "0f1117"))
+                        .foregroundColor(Color.theme.text)
 
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
                         infoItem(label: "Est. Gallons/wk", value: "\(business.total_est_gallons ?? 0)")
@@ -596,7 +596,7 @@ struct BusinessDetailView: View {
                     }
                 }
                 .padding(16)
-                .background(Color.white)
+                .background(Color.theme.surface)
                 .cornerRadius(14)
                 .shadow(color: Color.black.opacity(0.04), radius: 6, y: 2)
 
@@ -613,7 +613,7 @@ struct BusinessDetailView: View {
             }
             .padding(12)
         }
-        .background(Color(hex: "f5f4f0"))
+        .background(Color.theme.background)
         .navigationTitle(business.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -728,11 +728,11 @@ struct BusinessDetailView: View {
         VStack(alignment: .leading, spacing: 3) {
             Text(label.uppercased())
                 .font(.custom("DMSans-SemiBold", size: 9))
-                .foregroundColor(Color(hex: "7a7f94"))
+                .foregroundColor(Color.theme.textSecondary)
                 .tracking(0.5)
             Text(value)
                 .font(.custom("DMSans-Medium", size: 14))
-                .foregroundColor(Color(hex: "0f1117"))
+                .foregroundColor(Color.theme.text)
         }
     }
 
@@ -802,7 +802,7 @@ struct AddBusinessSheet: View {
                             .foregroundColor(Color(hex: "c1121f"))
                             .padding(12)
                             .frame(maxWidth: .infinity)
-                            .background(Color(hex: "ffe5e7"))
+                            .background(Color.theme.red.opacity(0.08))
                             .cornerRadius(8)
                     }
 
@@ -831,12 +831,12 @@ struct AddBusinessSheet: View {
                                     }
                                 }
                                 .pickerStyle(.menu)
-                                .tint(Color(hex: "0f1117"))
+                                .tint(Color.theme.text)
                                 .font(.custom("DMSans-Regular", size: 14))
                                 .padding(8)
-                                .background(Color.white)
+                                .background(Color.theme.surface)
                                 .cornerRadius(8)
-                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: "e2dfd6"), lineWidth: 1))
+                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.theme.border, lineWidth: 1))
                             }
                         }
 
@@ -847,9 +847,9 @@ struct AddBusinessSheet: View {
                                 .frame(minHeight: 80)
                                 .padding(8)
                                 .scrollContentBackground(.hidden)
-                                .background(Color.white)
+                                .background(Color.theme.surface)
                                 .cornerRadius(8)
-                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: "e2dfd6"), lineWidth: 1))
+                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.theme.border, lineWidth: 1))
                         }
                     }
 
@@ -863,7 +863,7 @@ struct AddBusinessSheet: View {
                                     .foregroundColor(Color(hex: "2d6a4f"))
                                 Text("Add First Location")
                                     .font(.custom("DMSans-SemiBold", size: 14))
-                                    .foregroundColor(Color(hex: "0f1117"))
+                                    .foregroundColor(Color.theme.text)
                             }
                         }
                         .tint(Color(hex: "c8893a"))
@@ -892,9 +892,9 @@ struct AddBusinessSheet: View {
                                         .keyboardType(.numberPad)
                                         .font(.custom("DMSans-Regular", size: 14))
                                         .padding(12)
-                                        .background(Color.white)
+                                        .background(Color.theme.surface)
                                         .cornerRadius(8)
-                                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: "e2dfd6"), lineWidth: 1))
+                                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.theme.border, lineWidth: 1))
                                 }
 
                                 VStack(alignment: .leading, spacing: 4) {
@@ -905,13 +905,13 @@ struct AddBusinessSheet: View {
                                         Text("Monthly").tag("monthly")
                                     }
                                     .pickerStyle(.menu)
-                                    .tint(Color(hex: "0f1117"))
+                                    .tint(Color.theme.text)
                                     .font(.custom("DMSans-Regular", size: 14))
                                     .padding(.vertical, 8)
                                     .padding(.horizontal, 6)
-                                    .background(Color.white)
+                                    .background(Color.theme.surface)
                                     .cornerRadius(8)
-                                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: "e2dfd6"), lineWidth: 1))
+                                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.theme.border, lineWidth: 1))
                                 }
                             }
 
@@ -919,19 +919,20 @@ struct AddBusinessSheet: View {
                                 formField(label: "Latitude", text: $latitude, placeholder: "e.g. 37.2710", keyboard: .numbersAndPunctuation)
                                 formField(label: "Longitude", text: $longitude, placeholder: "e.g. -79.9414", keyboard: .numbersAndPunctuation)
                             }
+                            .coordinatePaste(latitude: $latitude, longitude: $longitude)
                         }
                     }
                 }
                 .padding(20)
             }
-            .background(Color(hex: "f5f4f0"))
+            .background(Color.theme.background)
             .navigationTitle("Add Business")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") { dismiss() }
                         .font(.custom("DMSans-Regular", size: 14))
-                        .foregroundColor(Color(hex: "7a7f94"))
+                        .foregroundColor(Color.theme.textSecondary)
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: save) {
@@ -954,13 +955,13 @@ struct AddBusinessSheet: View {
     private func sectionLabel(_ text: String) -> some View {
         Text(text)
             .font(.custom("Syne-Bold", size: 16))
-            .foregroundColor(Color(hex: "0f1117"))
+            .foregroundColor(Color.theme.text)
     }
 
     private func fieldLabel(_ text: String) -> some View {
         Text(text.uppercased())
             .font(.custom("DMSans-SemiBold", size: 9))
-            .foregroundColor(Color(hex: "7a7f94"))
+            .foregroundColor(Color.theme.textSecondary)
             .tracking(0.4)
     }
 
@@ -971,9 +972,9 @@ struct AddBusinessSheet: View {
                 .keyboardType(keyboard)
                 .font(.custom("DMSans-Regular", size: 14))
                 .padding(12)
-                .background(Color.white)
+                .background(Color.theme.surface)
                 .cornerRadius(8)
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: "e2dfd6"), lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.theme.border, lineWidth: 1))
         }
     }
 
@@ -1059,7 +1060,7 @@ struct AddLocationSheet: View {
                             .foregroundColor(Color(hex: "c1121f"))
                             .padding(12)
                             .frame(maxWidth: .infinity)
-                            .background(Color(hex: "ffe5e7"))
+                            .background(Color.theme.red.opacity(0.08))
                             .cornerRadius(8)
                     }
 
@@ -1073,7 +1074,7 @@ struct AddLocationSheet: View {
                         }
                         .padding(12)
                         .frame(maxWidth: .infinity)
-                        .background(Color(hex: "d8f3dc"))
+                        .background(Color.theme.green.opacity(0.12))
                         .cornerRadius(8)
                     }
 
@@ -1100,9 +1101,9 @@ struct AddLocationSheet: View {
                                 .keyboardType(.numberPad)
                                 .font(.custom("DMSans-Regular", size: 14))
                                 .padding(12)
-                                .background(Color.white)
+                                .background(Color.theme.surface)
                                 .cornerRadius(8)
-                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: "e2dfd6"), lineWidth: 1))
+                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.theme.border, lineWidth: 1))
                         }
 
                         VStack(alignment: .leading, spacing: 4) {
@@ -1113,13 +1114,13 @@ struct AddLocationSheet: View {
                                 Text("Monthly").tag("monthly")
                             }
                             .pickerStyle(.menu)
-                            .tint(Color(hex: "0f1117"))
+                            .tint(Color.theme.text)
                             .font(.custom("DMSans-Regular", size: 14))
                             .padding(.vertical, 8)
                             .padding(.horizontal, 6)
-                            .background(Color.white)
+                            .background(Color.theme.surface)
                             .cornerRadius(8)
-                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: "e2dfd6"), lineWidth: 1))
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.theme.border, lineWidth: 1))
                         }
                     }
 
@@ -1127,17 +1128,18 @@ struct AddLocationSheet: View {
                         formField(label: "Latitude", text: $latitude, placeholder: "e.g. 37.2710", keyboard: .numbersAndPunctuation)
                         formField(label: "Longitude", text: $longitude, placeholder: "e.g. -79.9414", keyboard: .numbersAndPunctuation)
                     }
+                    .coordinatePaste(latitude: $latitude, longitude: $longitude)
                 }
                 .padding(20)
             }
-            .background(Color(hex: "f5f4f0"))
+            .background(Color.theme.background)
             .navigationTitle("Add Location")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Done") { dismiss() }
                         .font(.custom("DMSans-Regular", size: 14))
-                        .foregroundColor(Color(hex: "7a7f94"))
+                        .foregroundColor(Color.theme.textSecondary)
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     HStack(spacing: 12) {
@@ -1167,7 +1169,7 @@ struct AddLocationSheet: View {
     private func fieldLabel(_ text: String) -> some View {
         Text(text.uppercased())
             .font(.custom("DMSans-SemiBold", size: 9))
-            .foregroundColor(Color(hex: "7a7f94"))
+            .foregroundColor(Color.theme.textSecondary)
             .tracking(0.4)
     }
 
@@ -1178,9 +1180,9 @@ struct AddLocationSheet: View {
                 .keyboardType(keyboard)
                 .font(.custom("DMSans-Regular", size: 14))
                 .padding(12)
-                .background(Color.white)
+                .background(Color.theme.surface)
                 .cornerRadius(8)
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: "e2dfd6"), lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.theme.border, lineWidth: 1))
         }
     }
 
@@ -1260,7 +1262,7 @@ struct EditBusinessSheet: View {
                             .foregroundColor(Color(hex: "c1121f"))
                             .padding(12)
                             .frame(maxWidth: .infinity)
-                            .background(Color(hex: "ffe5e7"))
+                            .background(Color.theme.red.opacity(0.08))
                             .cornerRadius(8)
                     }
 
@@ -1270,9 +1272,9 @@ struct EditBusinessSheet: View {
                         TextField("Business name", text: $name)
                             .font(.custom("DMSans-Regular", size: 14))
                             .padding(12)
-                            .background(Color.white)
+                            .background(Color.theme.surface)
                             .cornerRadius(8)
-                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: "e2dfd6"), lineWidth: 1))
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.theme.border, lineWidth: 1))
                     }
 
                     // Status
@@ -1296,12 +1298,12 @@ struct EditBusinessSheet: View {
                                 }
                             }
                             .pickerStyle(.menu)
-                            .tint(Color(hex: "0f1117"))
+                            .tint(Color.theme.text)
                             .font(.custom("DMSans-Regular", size: 14))
                             .padding(8)
-                            .background(Color.white)
+                            .background(Color.theme.surface)
                             .cornerRadius(8)
-                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: "e2dfd6"), lineWidth: 1))
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.theme.border, lineWidth: 1))
                         }
                     }
 
@@ -1313,21 +1315,21 @@ struct EditBusinessSheet: View {
                             .frame(minHeight: 100)
                             .padding(8)
                             .scrollContentBackground(.hidden)
-                            .background(Color.white)
+                            .background(Color.theme.surface)
                             .cornerRadius(8)
-                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: "e2dfd6"), lineWidth: 1))
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.theme.border, lineWidth: 1))
                     }
                 }
                 .padding(20)
             }
-            .background(Color(hex: "f5f4f0"))
+            .background(Color.theme.background)
             .navigationTitle("Edit Business")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") { dismiss() }
                         .font(.custom("DMSans-Regular", size: 14))
-                        .foregroundColor(Color(hex: "7a7f94"))
+                        .foregroundColor(Color.theme.textSecondary)
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: save) {
@@ -1354,7 +1356,7 @@ struct EditBusinessSheet: View {
     private func fieldLabel(_ text: String) -> some View {
         Text(text.uppercased())
             .font(.custom("DMSans-SemiBold", size: 9))
-            .foregroundColor(Color(hex: "7a7f94"))
+            .foregroundColor(Color.theme.textSecondary)
             .tracking(0.4)
     }
 

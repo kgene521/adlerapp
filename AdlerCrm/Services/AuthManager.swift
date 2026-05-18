@@ -1,4 +1,4 @@
-// AdlerCRM/Services/AuthManager.swift  03/04/2026 02:16:32
+// /AdlerCRM/Services/AuthManager.swift  08/04/2026 05:30:00 EDT
 import Foundation
 import SwiftUI
 import Combine
@@ -12,15 +12,19 @@ final class AuthManager: ObservableObject {
     private let api = APIClient.shared
 
     init() {
-        // Restore session from keychain
+        // Restore session from keychain — requires token, user data, and HMAC secret
         if let token = KeychainHelper.load(key: "adler_token"),
            let userData = KeychainHelper.load(key: "adler_user"),
            let data = userData.data(using: .utf8),
-           let user = try? JSONDecoder().decode(UserInfo.self, from: data) {
+           let user = try? JSONDecoder().decode(UserInfo.self, from: data),
+           HMACSigner.hasSecret {
             self.currentUser = user
             self.isAuthenticated = true
             self.passwordExpired = KeychainHelper.load(key: "adler_pwd_expired") == "true"
             _ = token
+        } else {
+            // Incomplete session (missing HMAC key or token) — clear everything
+            logout()
         }
     }
 
@@ -33,28 +37,11 @@ final class AuthManager: ObservableObject {
         var tempToken: String?
         var userName: String?
         var error: String?
-        // Lockout
-        var locked = false
-        var lockedUntil: Date?
-        var retryAfterMinutes: Int?
-        var consecutiveFailures: Int?
     }
 
     func login(username: String, password: String) async -> LoginResult {
         do {
             let response = try await api.login(username: username, password: password)
-
-            // Check for lockout
-            if response.locked == true {
-                var result = LoginResult(error: response.error ?? "Account is locked")
-                result.locked = true
-                result.retryAfterMinutes = response.retry_after_minutes
-                result.consecutiveFailures = response.consecutive_failures
-                if let lu = response.locked_until {
-                    result.lockedUntil = ISO8601DateFormatter().date(from: lu)
-                }
-                return result
-            }
 
             if response.totp_required == true {
                 return LoginResult(
@@ -73,7 +60,6 @@ final class AuthManager: ObservableObject {
 
             return LoginResult(error: response.error ?? "Login failed")
         } catch {
-            // Handle 429 (locked) and 401 responses that come as errors
             let errMsg = error.localizedDescription
             return LoginResult(error: errMsg)
         }
@@ -87,6 +73,12 @@ final class AuthManager: ObservableObject {
 
     func verifyTOTP(tempToken: String, code: String) async throws {
         let response = try await api.totpVerify(tempToken: tempToken, code: code)
+
+        // Store HMAC signing key from server before finalizing login
+        if let hmacKey = response.hmac_key {
+            HMACSigner.storeSecret(hmacKey)
+        }
+
         finalizeLogin(
             token: response.token,
             user: response.user,
@@ -122,6 +114,7 @@ final class AuthManager: ObservableObject {
         KeychainHelper.delete(key: "adler_token")
         KeychainHelper.delete(key: "adler_user")
         KeychainHelper.delete(key: "adler_pwd_expired")
+        HMACSigner.clearSecret()
         self.currentUser = nil
         self.isAuthenticated = false
         self.passwordExpired = false

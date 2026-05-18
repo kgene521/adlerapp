@@ -1,4 +1,4 @@
-// AdlerCRM/Views/CorporateView.swift  07/04/2026 20:28:49
+// /AdlerCRM/Views/CorporateView.swift  12/04/2026 21:26:00 EDT
 import SwiftUI
 import PhotosUI
 
@@ -36,7 +36,7 @@ struct CorporateView: View {
             }
             .padding(12)
         }
-        .background(Color(hex: "f5f4f0"))
+        .background(Color.theme.background)
         .navigationTitle("Corporate")
         .navigationBarTitleDisplayMode(.inline)
         .task { await loadAll() }
@@ -72,13 +72,13 @@ struct CorporateView: View {
             HStack {
                 Label("Notes", systemImage: "note.text")
                     .font(.custom("Syne-Bold", size: 16))
-                    .foregroundColor(Color(hex: "0f1117"))
+                    .foregroundColor(Color.theme.text)
                 Spacer()
                 Text("\(notes.count)")
                     .font(.custom("DMSans-SemiBold", size: 11))
-                    .foregroundColor(Color(hex: "7a7f94"))
+                    .foregroundColor(Color.theme.textSecondary)
                     .padding(.horizontal, 7).padding(.vertical, 2)
-                    .background(Color(hex: "e2dfd6"))
+                    .background(Color.theme.border)
                     .cornerRadius(50)
                 if isAdmin {
                     Button(action: { showAddNote = true }) {
@@ -94,7 +94,7 @@ struct CorporateView: View {
             } else if notes.isEmpty {
                 Text("No corporate notes yet.")
                     .font(.custom("DMSans-Regular", size: 13))
-                    .foregroundColor(Color(hex: "7a7f94"))
+                    .foregroundColor(Color.theme.textSecondary)
                     .padding(.vertical, 4)
             } else {
                 VStack(spacing: 0) {
@@ -102,14 +102,14 @@ struct CorporateView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(note.note_text)
                                 .font(.custom("DMSans-Regular", size: 13))
-                                .foregroundColor(Color(hex: "0f1117"))
+                                .foregroundColor(Color.theme.text)
 
                             HStack(spacing: 8) {
                                 Text(formatDate(note.created_at))
                                     .font(.custom("DMSans-Regular", size: 10))
-                                    .foregroundColor(Color(hex: "7a7f94"))
+                                    .foregroundColor(Color.theme.textSecondary)
                                 if let by = note.created_by_name {
-                                    Text("·").foregroundColor(Color(hex: "e2dfd6"))
+                                    Text("·").foregroundColor(Color.theme.border)
                                     Text(by)
                                         .font(.custom("DMSans-Medium", size: 10))
                                         .foregroundColor(Color(hex: "c8893a"))
@@ -121,7 +121,7 @@ struct CorporateView: View {
                                         Button(role: .destructive, action: { noteToDelete = note; showDeleteNoteConfirm = true }) { Label("Delete", systemImage: "trash") }
                                     } label: {
                                         Image(systemName: "ellipsis")
-                                            .font(.system(size: 12)).foregroundColor(Color(hex: "7a7f94"))
+                                            .font(.system(size: 12)).foregroundColor(Color.theme.textSecondary)
                                             .frame(width: 24, height: 24)
                                     }
                                 }
@@ -135,7 +135,7 @@ struct CorporateView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(20)
-        .background(Color.white)
+        .background(Color.theme.surface)
         .cornerRadius(16)
         .shadow(color: Color.black.opacity(0.06), radius: 8, y: 2)
     }
@@ -147,7 +147,7 @@ struct CorporateView: View {
             HStack {
                 Label(title, systemImage: icon)
                     .font(.custom("Syne-Bold", size: 16))
-                    .foregroundColor(Color(hex: "0f1117"))
+                    .foregroundColor(Color.theme.text)
                 Spacer()
                 Text("\(items.count)")
                     .font(.custom("DMSans-SemiBold", size: 11))
@@ -169,7 +169,7 @@ struct CorporateView: View {
             } else if items.isEmpty {
                 Text("No \(title.lowercased()) uploaded yet.")
                     .font(.custom("DMSans-Regular", size: 13))
-                    .foregroundColor(Color(hex: "7a7f94"))
+                    .foregroundColor(Color.theme.textSecondary)
                     .padding(.vertical, 4)
             } else {
                 VStack(spacing: 0) {
@@ -183,19 +183,19 @@ struct CorporateView: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(doc.original_name ?? doc.file_name ?? "File")
                                     .font(.custom("DMSans-SemiBold", size: 13))
-                                    .foregroundColor(Color(hex: "0f1117"))
+                                    .foregroundColor(Color.theme.text)
                                     .lineLimit(1)
                                 HStack(spacing: 8) {
                                     Text(formatDate(doc.created_at))
                                         .font(.custom("DMSans-Regular", size: 10))
-                                        .foregroundColor(Color(hex: "7a7f94"))
+                                        .foregroundColor(Color.theme.textSecondary)
                                     if let by = doc.uploaded_by_name {
-                                        Text("·").foregroundColor(Color(hex: "e2dfd6"))
+                                        Text("·").foregroundColor(Color.theme.border)
                                         Text(by).font(.custom("DMSans-Medium", size: 10)).foregroundColor(Color(hex: "c8893a"))
                                     }
                                     if let size = doc.file_size {
-                                        Text("·").foregroundColor(Color(hex: "e2dfd6"))
-                                        Text(formatSize(size)).font(.custom("DMSans-Regular", size: 10)).foregroundColor(Color(hex: "7a7f94"))
+                                        Text("·").foregroundColor(Color.theme.border)
+                                        Text(formatSize(size)).font(.custom("DMSans-Regular", size: 10)).foregroundColor(Color.theme.textSecondary)
                                     }
                                 }
                             }
@@ -216,7 +216,7 @@ struct CorporateView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(20)
-        .background(Color.white)
+        .background(Color.theme.surface)
         .cornerRadius(16)
         .shadow(color: Color.black.opacity(0.06), radius: 8, y: 2)
     }
@@ -279,11 +279,11 @@ struct CorporateFilePreview: View {
             } else if ["jpg","jpeg","png","gif","heic","webp"].contains(url.pathExtension.lowercased()) {
                 if let data = try? Data(contentsOf: url), let img = UIImage(data: data) {
                     ScrollView { Image(uiImage: img).resizable().scaledToFit().padding() }
-                } else { Text("Cannot preview this file").foregroundColor(Color(hex: "7a7f94")) }
+                } else { Text("Cannot preview this file").foregroundColor(Color.theme.textSecondary) }
             } else {
                 VStack(spacing: 12) {
-                    Image(systemName: "doc.fill").font(.system(size: 48)).foregroundColor(Color(hex: "e2dfd6"))
-                    Text(fileName).font(.custom("DMSans-SemiBold", size: 14)).foregroundColor(Color(hex: "0f1117"))
+                    Image(systemName: "doc.fill").font(.system(size: 48)).foregroundColor(Color.theme.border)
+                    Text(fileName).font(.custom("DMSans-SemiBold", size: 14)).foregroundColor(Color.theme.text)
                     ShareLink(item: url) {
                         HStack(spacing: 6) {
                             Image(systemName: "square.and.arrow.up").font(.system(size: 13))
@@ -328,7 +328,7 @@ struct CorporateUploadSheet: View {
                 VStack(spacing: 16) {
                     if !errorMsg.isEmpty {
                         Text(errorMsg).font(.custom("DMSans-Regular", size: 13)).foregroundColor(Color(hex: "c1121f"))
-                            .padding(12).frame(maxWidth: .infinity).background(Color(hex: "ffe5e7")).cornerRadius(8)
+                            .padding(12).frame(maxWidth: .infinity).background(Color.theme.red.opacity(0.08)).cornerRadius(8)
                     }
 
                     Picker("Type", selection: $docType) {
@@ -345,9 +345,9 @@ struct CorporateUploadSheet: View {
                         .foregroundColor(Color(hex: "c8893a"))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
-                        .background(Color.white)
+                        .background(Color.theme.surface)
                         .cornerRadius(8)
-                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: "e2dfd6"), lineWidth: 1))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.theme.border, lineWidth: 1))
                     }
                     .onChange(of: selectedItem) { _, item in
                         guard let item = item else { return }
@@ -363,24 +363,24 @@ struct CorporateUploadSheet: View {
                     }
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("NOTES (OPTIONAL)").font(.custom("DMSans-SemiBold", size: 9)).foregroundColor(Color(hex: "7a7f94")).tracking(0.4)
+                        Text("NOTES (OPTIONAL)").font(.custom("DMSans-SemiBold", size: 9)).foregroundColor(Color.theme.textSecondary).tracking(0.4)
                         TextEditor(text: $notes)
                             .font(.custom("DMSans-Regular", size: 14))
                             .frame(minHeight: 80)
                             .padding(8)
                             .scrollContentBackground(.hidden)
-                            .background(Color.white)
+                            .background(Color.theme.surface)
                             .cornerRadius(8)
-                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: "e2dfd6"), lineWidth: 1))
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.theme.border, lineWidth: 1))
                     }
                 }.padding(20)
             }
-            .background(Color(hex: "f5f4f0"))
+            .background(Color.theme.background)
             .navigationTitle("Upload to Corporate")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") { dismiss() }.font(.custom("DMSans-Regular", size: 14)).foregroundColor(Color(hex: "7a7f94"))
+                    Button("Cancel") { dismiss() }.font(.custom("DMSans-Regular", size: 14)).foregroundColor(Color.theme.textSecondary)
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: upload) {
@@ -428,22 +428,22 @@ struct CorporateNoteSheet: View {
             VStack(spacing: 16) {
                 if !errorMsg.isEmpty {
                     Text(errorMsg).font(.custom("DMSans-Regular", size: 13)).foregroundColor(Color(hex: "c1121f"))
-                        .padding(12).frame(maxWidth: .infinity).background(Color(hex: "ffe5e7")).cornerRadius(8)
+                        .padding(12).frame(maxWidth: .infinity).background(Color.theme.red.opacity(0.08)).cornerRadius(8)
                 }
                 TextEditor(text: $text)
                     .font(.custom("DMSans-Regular", size: 14))
                     .frame(minHeight: 120)
-                    .padding(8).background(Color.white).cornerRadius(8)
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: "e2dfd6"), lineWidth: 1))
+                    .padding(8).background(Color.theme.surface).cornerRadius(8)
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.theme.border, lineWidth: 1))
                 Spacer()
             }
             .padding(20)
-            .background(Color(hex: "f5f4f0"))
+            .background(Color.theme.background)
             .navigationTitle(note == nil ? "Add Note" : "Edit Note")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") { dismiss() }.font(.custom("DMSans-Regular", size: 14)).foregroundColor(Color(hex: "7a7f94"))
+                    Button("Cancel") { dismiss() }.font(.custom("DMSans-Regular", size: 14)).foregroundColor(Color.theme.textSecondary)
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: save) {
