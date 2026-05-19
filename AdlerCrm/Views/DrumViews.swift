@@ -1,4 +1,4 @@
-// /AdlerCRM/Views/DrumViews.swift  17/05/2026 23:40:00 EDT
+// /AdlerCRM/Views/DrumViews.swift  18/05/2026 01:18:00 EDT
 import SwiftUI
 import CoreLocation
 import CoreNFC
@@ -65,7 +65,7 @@ struct DrumScanButton: View {
             }
 
             // Error
-            if let err = scanError {
+            if let err = scanError ?? nfc.error {
                 Text(err)
                     .font(.custom("DMSans-Regular", size: 11))
                     .foregroundColor(Color(hex: "c1121f"))
@@ -126,6 +126,9 @@ struct RegisterDrumSheet: View {
     @State private var saving = false
     @State private var errorMsg = ""
     @State private var loadingData = true
+    @State private var showWriteTag = false
+    @State private var showWriteSheet = false
+    @State private var registeredDrum: Drum?
 
     var body: some View {
         NavigationStack {
@@ -258,6 +261,27 @@ struct RegisterDrumSheet: View {
                     Task { await loadLocations(bizId: bizId) }
                 }
             }
+            .alert("Write Drum ID to Tag?", isPresented: $showWriteTag) {
+                Button("Write Tag") {
+                    // Small delay to let the alert dismiss before NFC sheet appears
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        showWriteSheet = true
+                    }
+                }
+                Button("Skip", role: .cancel) { dismiss() }
+            } message: {
+                Text("Program this NFC tag with the drum ID so it can be identified on future scans.")
+            }
+            .sheet(isPresented: $showWriteSheet, onDismiss: { dismiss() }) {
+                if let drum = registeredDrum {
+                    WriteTagSheet(payload: "ADLER_DRUM_\(drum.id)") { writtenPayload in
+                        // Update drum's tag ID in database to match what was written
+                        Task {
+                            let _ = try? await APIClient.shared.updateDrumTagId(id: drum.id, nfcTagId: writtenPayload)
+                        }
+                    }
+                }
+            }
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
@@ -322,7 +346,8 @@ struct RegisterDrumSheet: View {
                     tagType: tagType
                 )
                 onRegistered(drum)
-                dismiss()
+                registeredDrum = drum
+                showWriteTag = true
             } catch {
                 errorMsg = error.localizedDescription
             }
@@ -505,6 +530,7 @@ struct DrumDetailSheet: View {
 
 struct WriteTagSheet: View {
     let payload: String
+    var onWritten: ((String) -> Void)? = nil
     @Environment(\.dismiss) var dismiss
     @ObservedObject private var nfc = NFCManager.shared
     @State private var writeSuccess = false
@@ -593,6 +619,7 @@ struct WriteTagSheet: View {
         nfc.write(payload: payload) { success, error in
             if success {
                 writeSuccess = true
+                onWritten?(payload)
             } else {
                 writeError = error ?? "Failed to write tag."
             }

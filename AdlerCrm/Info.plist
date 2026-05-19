@@ -4,6 +4,8 @@
 <dict>
 	<key>NFCReaderUsageDescription</key>
 	<string>Adler CRM needs NFC access to scan and identify oil collection drums.</string>
+	<key>NSLocationUsageDescription</key>
+	<string>Adler CRM needs location information to correctly create and optimize routes</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>

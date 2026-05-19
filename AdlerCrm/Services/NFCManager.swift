@@ -1,4 +1,4 @@
-// /AdlerCRM/Services/NFCManager.swift  17/05/2026 23:38:00 EDT
+// /AdlerCRM/Services/NFCManager.swift  18/05/2026 01:09:00 EDT
 import Foundation
 import Combine
 import CoreNFC
@@ -31,7 +31,7 @@ class NFCManager: NSObject, ObservableObject {
         error = nil
         isScanning = true
 
-        readSession = NFCNDEFReaderSession(delegate: self, queue: nil, invalidateAfterFirstRead: true)
+        readSession = NFCNDEFReaderSession(delegate: self, queue: nil, invalidateAfterFirstRead: false)
         readSession?.alertMessage = "Hold your iPhone near the NFC tag on the drum."
         readSession?.begin()
     }
@@ -142,23 +142,22 @@ extension NFCManager: NFCNDEFReaderSessionDelegate {
                         onWrite = nil
                     }
                 } else {
-                    // Read mode
-                    let message = try await tag.readNDEF()
-                    guard let record = message.records.first else {
-                        // Blank tag — use tag UID/identifier if available
-                        let blankId = "BLANK_\(UUID().uuidString.prefix(8))"
-                        session.invalidate()
-                        await MainActor.run {
-                            lastTagId = blankId
-                            lastTagType = tagType
-                            isScanning = false
-                            onRead?(blankId, tagType)
-                            onRead = nil
+                    // Read mode — try reading NDEF, handle blank tags gracefully
+                    var tagId: String
+                    
+                    do {
+                        let message = try await tag.readNDEF()
+                        if let record = message.records.first, !message.records.isEmpty {
+                            tagId = extractPayload(from: record)
+                        } else {
+                            tagId = "BLANK_\(UUID().uuidString.prefix(8))"
                         }
-                        return
+                    } catch {
+                        // Tag has no NDEF data — treat as blank tag
+                        tagId = "BLANK_\(UUID().uuidString.prefix(8))"
                     }
 
-                    let tagId = extractPayload(from: record)
+                    session.alertMessage = "Tag detected!"
                     session.invalidate()
 
                     await MainActor.run {

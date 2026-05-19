@@ -1,4 +1,4 @@
-// /AdlerCRM/Services/APIClient.swift  17/05/2026 23:22:00 EDT
+// /AdlerCRM/Services/APIClient.swift  18/05/2026 01:18:00 EDT
 import Foundation
 
 class APIClient {
@@ -838,6 +838,10 @@ class APIClient {
     func retireDrum(id: Int) async throws {
         struct R: Codable { let ok: Bool? }
         let _: R = try await request(path: "/drums/\(id)", method: "DELETE")
+    }
+
+    func updateDrumTagId(id: Int, nfcTagId: String) async throws -> Drum {
+        return try await request(path: "/drums/\(id)/update-tag", method: "PUT", body: ["nfc_tag_id": nfcTagId])
     }
 }
 
